@@ -3,14 +3,22 @@ Section 5: train/test split integrity.
 
 Verifies split_indices.json's train/test peptide_id sets are disjoint, their
 union exactly equals the final dataset's unique peptide_id set (no orphans
-either direction), sizes match the audit's claimed 11,114/3,376, and every
+either direction), sizes match the audit's claimed 11,114/4,790, and every
 organism-row in the final dataset has a split assignment consistent with its
 peptide (split_level is documented as "unique peptide_id").
+
+Test is larger than a naive 80/20 split would suggest (4,790 vs. an original
+3,376) because qmap.toolkit.train_test_split's post_filtering=True removes
+train peptides that are too similar to a test peptide (leakage prevention);
+as of the 2026-08-07 fix, scripts/07_build_final_and_split.py reassigns those
+peptides to test explicitly (see split_indices.json's
+leakage_filter_reassigned_to_test_peptide_ids) rather than leaving them
+unassigned, which is what EXPECTED_TEST below reflects.
 """
 from qa_common import QAContext, SectionResult, fmt_int, md_table
 
 EXPECTED_TRAIN = 11114
-EXPECTED_TEST = 3376
+EXPECTED_TEST = 4790
 
 
 def run(ctx: QAContext) -> SectionResult:
