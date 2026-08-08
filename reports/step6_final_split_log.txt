@@ -1,0 +1,17 @@
+=== Step 6: final dataset assembly + homology-aware split ===
+Final table rows (peptide x organism MIC pairs): 72587
+Unique peptides: 15904
+  rows from source=qmap_original: 62331
+  rows from source=recovered: 10256
+  unique peptides source=qmap_original: 13680
+  unique peptides source=recovered: 2224
+
+Split (pre leakage-filter reconciliation): 11114 train peptides / 3376 test peptides (threshold=0.6, target test_size=0.2, seed=42)
+post_filtering=True removed 1414 peptides from train for having a >= 0.6 identity edge to a test peptide. These are reassigned to test (see leakage_filter_reassigned_to_test_peptide_ids in split_indices.json) rather than left unassigned.
+Final split: 11114 train peptides / 4790 test peptides
+  train rows: 51722, test rows: 20865
+Reconciliation check: train + test == unique peptides? 11114 + 4790 = 15904 (unique peptides = 15904) -> OK
+Train/test overlap check: 0 peptide_ids in both -> OK
+
+Final dataset: /Users/lukajin/PycharmProjects/soamp/.claude/worktrees/qa-pass/scripts/../data/final_mic_regression_dataset.csv
+Split indices: /Users/lukajin/PycharmProjects/soamp/.claude/worktrees/qa-pass/scripts/../data/split_indices.json

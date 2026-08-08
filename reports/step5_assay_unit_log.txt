@@ -1,0 +1,44 @@
+=== Step 5: assay filtering + unit standardization ===
+Peptides considered: 20903 (QMAP baseline: 18033, recovered: 2870)
+Peptides where SMILES could not be resolved at all (excluded entirely): 114
+Peptides where SMILES resolved but RDKit MW computation failed: 0
+
+Total raw targetActivity records examined across included peptides: 163653
+Excluded: non-MIC assay type (activityMeasureGroup != 'MIC'): 47604
+  top excluded assay types:
+    MBC: 12763
+    None: 10082
+    IC50: 8290
+    LC: 2075
+    MIC50: 1572
+    MFC: 1198
+    MIC90: 1091
+    EC50: 927
+    LD50: 886
+    IC50 I: 770
+    LC50: 619
+    IC50 REP: 610
+    MEC: 587
+    90-100% Inhibition: 448
+    50% Cell death: 331
+Excluded: non-bacterial target domain: 11766
+  Fungus: 11612
+  Other: 97
+  Unknown: 56
+  Animal: 1
+Excluded: unsupported/missing unit: 23
+  None: 23
+Excluded: MW unavailable at ug/mL->uM conversion time: 627
+Excluded: unparseable/missing concentration string: 4
+
+Kept raw (peptide, species, measurement) rows after all filters: 103629
+Censoring classification of kept raw measurements (before grouping):
+  exact: 74233
+  censored: 22583
+  ranged: 6813
+  missing: 4
+
+Final (peptide, organism) groups: 72587
+Groups with >1 raw measurement (averaged): 15456
+Groups where IQR removed >=1 outlier point: 2236
+Total individual outlier points removed: 4062

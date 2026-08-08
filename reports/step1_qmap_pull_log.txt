@@ -1,0 +1,58 @@
+=== Step 1: QMAP included dataset pull ===
+Source: huggingface anthol42/qmap_benchmark_2025 / dbaasp.json
+Total peptide records in QMAP dataset: 18033
+Peptides with >=1 bacterial MIC target (species) recorded: 13761
+Peptides with native DBAASP SMILES present: 14785 (82.0%)
+  - of which have >1 SMILES candidate listed: 9702
+Peptides flagged has_noncanonical=True: 1964 (10.9%)
+Peptides canonical-only: 16069
+
+Non-canonical breakdown (peptide-level, by residue kind combination present):
+  canonical: 16069
+  D-canonical-residue: 1350
+  other_unresolved(has_smiles): 254
+  D-canonical-residue+ornithine: 137
+  ornithine: 87
+  D-canonical-residue+other_unresolved(has_smiles): 70
+  dab: 32
+  D-canonical-residue+dab: 18
+  ornithine+other_unresolved(has_smiles): 5
+  D-canonical-residue+dab+ornithine: 4
+  dab+ornithine: 3
+  dab+other_unresolved(has_smiles): 3
+  other_char: : 1
+
+Bond type counts (peptide-level, DSB/AMD only per QMAP filter):
+  none: 14661
+  DSB: 2358
+  AMD: 1214
+
+MIC unit: uM for all 'targets' entries (QMAP's target_base.py converts ug/mL -> uM via computed molecular weight before this file is produced; confirmed by reading QMAP source, no unit field is stored in this flattened export so this is a methodology-level confirmation, not a per-row field).
+Unique organisms across all (peptide, organism) MIC rows: 492
+Total (peptide, organism) MIC rows written to /Users/lukajin/PycharmProjects/soamp/scripts/../data/qmap_included.csv: 62729
+Peptides with zero bacterial MIC targets (present in QMAP's 18,033 but contribute 0 rows to the flattened regression table -- e.g. hemolysis-only entries or species that didn't pass QMAP's Bacteria/MIC/unit filters): 4272
+
+MANUAL REVIEW FLAGS (1):
+  peptide_id=21052: sequence has leading/trailing whitespace: ' LLLRRRRLL'
+
+Top 20 organisms by row count:
+  Escherichia coli: 11059
+  Staphylococcus aureus: 10252
+  Pseudomonas aeruginosa: 7502
+  Bacillus subtilis: 3398
+  Klebsiella pneumoniae: 3045
+  Staphylococcus epidermidis: 2718
+  Acinetobacter baumannii: 2399
+  Enterococcus faecalis: 2124
+  Salmonella enterica: 2019
+  Micrococcus luteus: 1272
+  Salmonella typhimurium: 968
+  Enterococcus faecium: 793
+  Listeria monocytogenes: 709
+  Bacillus cereus: 708
+  Enterobacter cloacae: 558
+  Bacillus megaterium: 420
+  Pseudomonas syringae: 365
+  Streptococcus pyogenes: 352
+  Proteus mirabilis: 312
+  Streptococcus mutans: 303

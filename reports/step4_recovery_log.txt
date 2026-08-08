@@ -1,0 +1,53 @@
+=== Step 4: recovery of non-canonical/cyclic peptides excluded from QMAP ===
+Total candidate entries considered (buckets b1-b5): 6411
+  of which out of scope (non-monomer, not attempted): 664
+Recovered: 2870
+Unconvertible (logged, excluded): 3541
+
+Recovered by source:
+  native_dbaasp_smiles: 2853
+  p2smi_generated(linear): 11
+  p2smi_generated(SS): 3
+  p2smi_generated(HT): 3
+
+Recovered / attempted by bucket (recovery category):
+  b1_excluded_non_monomer (out_of_scope): 0 recovered / 664 total
+  b2_excluded_unsupported_terminus (terminus_based): 1230 recovered / 2565 total
+  b3_excluded_residue_no_smiles (residue_based): 17 recovered / 1428 total
+  b4_excluded_nonstandard_bond (bond_based): 6 recovered / 135 total
+  b5_excluded_unexplained (unexplained_temporal_drift): 1617 recovered / 1619 total
+
+Unconvertible reason summary (top-level, truncated):
+  position 1: 466
+  position 2: 197
+  unsupported N-terminal modification 'C8': 119
+  position 4: 119
+  position 3: 101
+  position 5: 94
+  unsupported N-terminal modification ': 72
+  position 6: 68
+  unsupported N-terminal modification '3,5 Bis-: 60
+  position 8: 50
+  position 7: 49
+  bond constraint 'SCSC' not auto-generated in this pass: 43
+  unsupported N-terminal modification 'C12': 37
+  unsupported N-terminal modification '3-OH-5-Me-C6': 34
+  2 intrachain bonds present -- multi-bond: 34
+  position 9: 32
+  position 16: 27
+  position 10: 26
+  unsupported C-terminal modification 'PEA': 25
+  position 18: 24
+  unsupported N-terminal modification 'C10': 24
+  unsupported N-terminal modification 'FMOC': 22
+  unsupported C-terminal modification 'A: 22
+  position 11: 21
+  unsupported N-terminal modification 'OIle': 21
+  unsupported C-terminal modification 'PHEol': 20
+  3 intrachain bonds present -- multi-bond: 19
+  unsupported N-terminal modification 'BZA': 18
+  unsupported N-terminal modification 'C14': 18
+  unrecognized DBAASP cycleType='LCN': 18
+
+Full recovered list: /Users/lukajin/PycharmProjects/soamp/scripts/../data/recovered_peptides.csv
+Full unconvertible list (with per-entry reason): /Users/lukajin/PycharmProjects/soamp/scripts/../data/unconvertible_peptides.csv
