@@ -1,6 +1,6 @@
 # Curation audit report: SMILES-based AMP MIC regression dataset
 
-Generated: 2026-08-07
+Generated: 2026-08-10
 
 ## Overview
 
@@ -1254,8 +1254,8 @@ Final split: 11114 train peptides / 4790 test peptides
 Reconciliation check: train + test == unique peptides? 11114 + 4790 = 15904 (unique peptides = 15904) -> OK
 Train/test overlap check: 0 peptide_ids in both -> OK
 
-Final dataset: /Users/lukajin/PycharmProjects/soamp/.claude/worktrees/qa-pass/scripts/../data/final_mic_regression_dataset.csv
-Split indices: /Users/lukajin/PycharmProjects/soamp/.claude/worktrees/qa-pass/scripts/../data/split_indices.json
+Final dataset: /Users/lukajin/PycharmProjects/soamp/scripts/../data/final_mic_regression_dataset.csv
+Split indices: /Users/lukajin/PycharmProjects/soamp/scripts/../data/split_indices.json
 ```
 
 ## Final dataset composition
