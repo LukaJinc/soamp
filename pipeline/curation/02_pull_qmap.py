@@ -30,9 +30,9 @@ import re
 import csv
 from collections import Counter
 
-HF_JSON = os.path.join(os.path.dirname(__file__), "..", ".cache", "qmap_hf", "dbaasp.json")
-OUT_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "qmap_included.csv")
-LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "reports", "step1_qmap_pull_log.txt")
+HF_JSON = os.path.join(os.path.dirname(__file__), "..", "..", ".cache", "qmap_hf", "dbaasp.json")
+OUT_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "qmap_included.csv")
+LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "reports", "step1_qmap_pull_log.txt")
 
 CANONICAL_L = set("ACDEFGHIKLMNPQRSTVWY")
 

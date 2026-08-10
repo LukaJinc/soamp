@@ -20,7 +20,7 @@ which residue it is. The two unconditional, SMILES-independent exclusion axes ar
 approximation) so the diff step's bucket assignment is a faithful reconstruction
 of QMAP's actual behavior, not a re-guessed filter.
 """
-from parse_dbaasp import DBAASPPeptide, has_unresolved_placeholder
+from soamp.curation.parse_dbaasp import DBAASPPeptide, has_unresolved_placeholder
 
 ORN_DAB_MODIFICATIONS = {"ORN": "O", "D-ORN": "o", "DAB": "B", "D-DAB": "b"}
 

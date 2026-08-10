@@ -9,7 +9,7 @@ import csv
 from collections import Counter
 from datetime import date
 
-BASE = os.path.join(os.path.dirname(__file__), "..")
+BASE = os.path.join(os.path.dirname(__file__), "..", "..")
 REPORTS = os.path.join(BASE, "reports")
 DATA = os.path.join(BASE, "data")
 OUT_MD = os.path.join(REPORTS, "curation_audit.md")

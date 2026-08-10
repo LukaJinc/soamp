@@ -25,20 +25,18 @@ See qmap_filter.py's module docstring for the important finding that
 reason -- so there is no separate bucket for it here (it would fall through to
 in_both or b5, not a residue-based bucket).
 """
-import sys
 import os
 import json
 import csv
 from collections import Counter
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "common"))
-from parse_dbaasp import DBAASPPeptide
-from qmap_filter import qmap_inclusion_check
+from soamp.curation.parse_dbaasp import DBAASPPeptide
+from soamp.curation.qmap_filter import qmap_inclusion_check
 
-RAW_JSONL = os.path.join(os.path.dirname(__file__), "..", ".cache", "dbaasp_raw.jsonl")
-QMAP_JSON = os.path.join(os.path.dirname(__file__), "..", ".cache", "qmap_hf", "dbaasp.json")
-OUT_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "dbaasp_vs_qmap_diff.csv")
-LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "reports", "step3_diff_log.txt")
+RAW_JSONL = os.path.join(os.path.dirname(__file__), "..", "..", ".cache", "dbaasp_raw.jsonl")
+QMAP_JSON = os.path.join(os.path.dirname(__file__), "..", "..", ".cache", "qmap_hf", "dbaasp.json")
+OUT_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "dbaasp_vs_qmap_diff.csv")
+LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "reports", "step3_diff_log.txt")
 
 
 def main():

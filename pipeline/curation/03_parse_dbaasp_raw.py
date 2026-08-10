@@ -9,18 +9,16 @@ detected (with counts), and intrachain bond types other than disulfide/amide
 No filtering happens here -- every peptide entry successfully fetched is retained
 and flagged, per the task's "keep everything, flag it instead" instruction.
 """
-import sys
 import os
 import json
 import csv
 from collections import Counter
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "common"))
-from parse_dbaasp import DBAASPPeptide
+from soamp.curation.parse_dbaasp import DBAASPPeptide
 
-RAW_JSONL = os.path.join(os.path.dirname(__file__), "..", ".cache", "dbaasp_raw.jsonl")
-OUT_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "dbaasp_raw_full.csv")
-LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "reports", "step2_dbaasp_raw_pull_log.txt")
+RAW_JSONL = os.path.join(os.path.dirname(__file__), "..", "..", ".cache", "dbaasp_raw.jsonl")
+OUT_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "dbaasp_raw_full.csv")
+LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "reports", "step2_dbaasp_raw_pull_log.txt")
 
 FIELDNAMES = [
     "peptide_id", "dbaasp_id", "sequence", "sequence_length",

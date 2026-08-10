@@ -19,8 +19,8 @@ Scope (deliberately bounded -- see bond_map.py for the full rationale):
     since we have no verified SMILES fragment source for those groups.
 """
 import p2smi.utilities.smilesgen as smilesgen
-from residue_map import lookup_p2smi
-from bond_map import classify_bond
+from soamp.curation.residue_map import lookup_p2smi
+from soamp.curation.bond_map import classify_bond
 
 LETTER2NAME = smilesgen.LETTER2NAME
 SUPPORTED_NTERM = {None, "ACT"}

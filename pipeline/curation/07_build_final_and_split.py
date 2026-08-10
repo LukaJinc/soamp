@@ -28,17 +28,14 @@ preserves the independence guarantee -- and records the reassignment separately
 in split_indices.json and in this step's log, so the gap can never again go
 unnoticed.
 """
-import sys
 import os
 import csv
 import json
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "common"))
-
-STEP5_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "step5_standardized_mic.csv")
-FINAL_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "final_mic_regression_dataset.csv")
-SPLIT_JSON = os.path.join(os.path.dirname(__file__), "..", "data", "split_indices.json")
-LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "reports", "step6_final_split_log.txt")
+STEP5_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "step5_standardized_mic.csv")
+FINAL_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "final_mic_regression_dataset.csv")
+SPLIT_JSON = os.path.join(os.path.dirname(__file__), "..", "..", "data", "split_indices.json")
+LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "reports", "step6_final_split_log.txt")
 
 FINAL_FIELDNAMES = [
     "peptide_id", "sequence", "smiles", "organism", "ncbi_taxon_id_if_available",

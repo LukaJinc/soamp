@@ -22,25 +22,23 @@ values are converted to uM via the peptide's RDKit molecular weight, and
 multiple measurements for the same (peptide, species) pair are IQR-outlier-
 filtered and averaged (matching QMAP's method, units/get_iqr port).
 """
-import sys
 import os
 import json
 import csv
 import math
 from collections import defaultdict, Counter
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "common"))
-from parse_dbaasp import DBAASPPeptide
-from smiles_gen import generate_smiles
-from units import parse_activity, classify_censoring, compute_smiles_weight, ug_ml_to_uM, precision
-from taxonomy import classify_species
+from soamp.curation.parse_dbaasp import DBAASPPeptide
+from soamp.curation.smiles_gen import generate_smiles
+from soamp.curation.units import parse_activity, classify_censoring, compute_smiles_weight, ug_ml_to_uM, precision
+from soamp.curation.taxonomy import classify_species
 import numpy as np
 
-RAW_JSONL = os.path.join(os.path.dirname(__file__), "..", ".cache", "dbaasp_raw.jsonl")
-DIFF_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "dbaasp_vs_qmap_diff.csv")
-RECOVERED_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "recovered_peptides.csv")
-OUT_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "step5_standardized_mic.csv")
-LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "reports", "step5_assay_unit_log.txt")
+RAW_JSONL = os.path.join(os.path.dirname(__file__), "..", "..", ".cache", "dbaasp_raw.jsonl")
+DIFF_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "dbaasp_vs_qmap_diff.csv")
+RECOVERED_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "recovered_peptides.csv")
+OUT_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "step5_standardized_mic.csv")
+LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "reports", "step5_assay_unit_log.txt")
 
 
 def get_iqr(values):

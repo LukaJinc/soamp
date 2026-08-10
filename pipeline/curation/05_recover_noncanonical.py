@@ -19,20 +19,18 @@ Output: data/recovered_peptides.csv (peptide_id, sequence, smiles, recovered_via
 recovery_category, nterminus, cterminus, bond_types, has_noncanonical), plus
 reports/step4_recovery_log.txt with full before/after counts by reason.
 """
-import sys
 import os
 import json
 import csv
 from collections import Counter
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "common"))
-from parse_dbaasp import DBAASPPeptide
-from smiles_gen import generate_smiles
+from soamp.curation.parse_dbaasp import DBAASPPeptide
+from soamp.curation.smiles_gen import generate_smiles
 
-RAW_JSONL = os.path.join(os.path.dirname(__file__), "..", ".cache", "dbaasp_raw.jsonl")
-DIFF_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "dbaasp_vs_qmap_diff.csv")
-OUT_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "recovered_peptides.csv")
-LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "reports", "step4_recovery_log.txt")
+RAW_JSONL = os.path.join(os.path.dirname(__file__), "..", "..", ".cache", "dbaasp_raw.jsonl")
+DIFF_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "dbaasp_vs_qmap_diff.csv")
+OUT_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "recovered_peptides.csv")
+LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "reports", "step4_recovery_log.txt")
 
 BUCKET_TO_CATEGORY = {
     "b2_excluded_unsupported_terminus": "terminus_based",
@@ -123,7 +121,7 @@ def main():
         writer.writeheader()
         writer.writerows(recovered)
 
-    unconv_path = os.path.join(os.path.dirname(__file__), "..", "data", "unconvertible_peptides.csv")
+    unconv_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "unconvertible_peptides.csv")
     with open(unconv_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(unconvertible[0].keys()))
         writer.writeheader()

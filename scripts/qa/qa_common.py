@@ -17,7 +17,6 @@ The two exceptions (disclosed, not hidden) are:
     the Bacteria-domain filter to every row, using this same classifier.
 """
 import os
-import sys
 import json
 import re
 from dataclasses import dataclass, field
@@ -28,11 +27,9 @@ import numpy as np
 from rdkit import Chem, RDLogger
 from rdkit.Chem import Descriptors
 
-RDLogger.DisableLog('rdApp.*')
+from soamp.curation.taxonomy import classify_species
 
-COMMON_DIR = os.path.join(os.path.dirname(__file__), "..", "common")
-sys.path.insert(0, os.path.abspath(COMMON_DIR))
-from taxonomy import classify_species  # noqa: E402
+RDLogger.DisableLog('rdApp.*')
 
 BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DATA = os.path.join(BASE, "data")
