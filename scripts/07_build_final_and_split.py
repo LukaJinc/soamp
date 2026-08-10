@@ -11,6 +11,22 @@ row -- so that all (organism) rows sharing a peptide stay in the same side of th
 split; splitting at the row level would leak near-identical sequences across
 train/test through their organism-duplicated rows, defeating the point of a
 homology-aware split.
+
+qmap.toolkit.train_test_split defaults to post_filtering=True: after clustering
+every peptide into train/test, it removes any train-assigned peptide that has a
+similarity edge (>= threshold identity) to a test peptide, to guarantee train and
+test are genuinely independent. This filter only ever removes from train -- test
+is untouched -- and the removed peptides are dropped from the function's return
+value entirely, with no indication of which peptides were removed. Earlier
+versions of this script wrote train_ids/test_ids straight through and never
+reconciled them against the full peptide set, so peptides removed by this filter
+silently ended up with no split assignment at all (a QA pass caught 1,414 such
+peptides missing from data/split_indices.json). This version explicitly computes
+and reassigns any such peptides to the test set -- not train, since filter_out
+only flags them for being *too close to test*, so keeping them out of train
+preserves the independence guarantee -- and records the reassignment separately
+in split_indices.json and in this step's log, so the gap can never again go
+unnoticed.
 """
 import sys
 import os
@@ -32,6 +48,16 @@ FINAL_FIELDNAMES = [
 RANDOM_SEED = 42
 IDENTITY_THRESHOLD = 0.60
 TEST_SIZE = 0.2
+
+POST_FILTERING_NOTE = (
+    "qmap.toolkit.train_test_split's post_filtering=True (the library default, used here) "
+    "removes any train-assigned peptide with a similarity edge (>= identity_threshold) to a "
+    "test peptide, to guarantee train/test independence. This filter only ever removes from "
+    "train, never test. The peptide_ids in leakage_filter_reassigned_to_test_peptide_ids are "
+    "exactly the ones this filter removed from train; they are added to test_peptide_ids "
+    "(also included there) rather than left unassigned or put back in train, since putting "
+    "them in test does not violate the independence guarantee the filter exists to enforce."
+)
 
 
 def main():
@@ -82,6 +108,7 @@ def main():
     log_lines.append(f"  unique peptides source=qmap_original: {uniq_qmap}")
     log_lines.append(f"  unique peptides source=recovered: {uniq_recovered}")
 
+    dropped_ids = []
     try:
         from qmap.toolkit import train_test_split
         train_seqs, test_seqs, train_ids, test_ids = train_test_split(
@@ -90,11 +117,22 @@ def main():
             random_state=RANDOM_SEED, verbose=True,
         )
         split_ok = True
+
+        # post_filtering (default True) removes train peptides with an edge to a test
+        # peptide, and drops them from both returned lists with no record. Reconcile
+        # against the full peptide set and reassign anything missing to test.
+        n_train_pre_reassign = len(train_ids)
+        n_test_pre_reassign = len(test_ids)
+        assigned = set(train_ids) | set(test_ids)
+        dropped_ids = sorted(set(peptide_ids) - assigned)
+        test_ids = list(test_ids) + dropped_ids
+
     except Exception as e:
         log_lines.append(f"\nWARNING: qmap.toolkit.train_test_split failed: {e}")
         log_lines.append("Falling back: NO split performed; split_indices.json will be empty. "
                           "Flagged for manual review.")
         train_ids, test_ids = [], []
+        n_train_pre_reassign, n_test_pre_reassign = 0, 0
         split_ok = False
 
     train_id_set = set(train_ids)
@@ -107,6 +145,9 @@ def main():
         "test_size": TEST_SIZE,
         "random_state": RANDOM_SEED,
         "split_level": "unique peptide_id (all organism rows for a peptide share its split assignment)",
+        "post_filtering": True,
+        "post_filtering_note": POST_FILTERING_NOTE if split_ok else "",
+        "leakage_filter_reassigned_to_test_peptide_ids": [str(x) for x in dropped_ids],
         "train_peptide_ids": [str(x) for x in train_ids],
         "test_peptide_ids": [str(x) for x in test_ids],
     }
@@ -117,9 +158,22 @@ def main():
         n_train_rows = sum(1 for r in final_rows if r["peptide_id"] in train_id_set)
         n_test_rows = sum(1 for r in final_rows if r["peptide_id"] in test_id_set)
         log_lines.append("")
-        log_lines.append(f"Split: {len(train_ids)} train peptides / {len(test_ids)} test peptides "
+        log_lines.append(f"Split (pre leakage-filter reconciliation): "
+                          f"{n_train_pre_reassign} train peptides / {n_test_pre_reassign} test peptides "
                           f"(threshold={IDENTITY_THRESHOLD}, target test_size={TEST_SIZE}, seed={RANDOM_SEED})")
+        log_lines.append(f"post_filtering=True removed {len(dropped_ids)} peptides from train for having "
+                          f"a >= {IDENTITY_THRESHOLD} identity edge to a test peptide. These are reassigned "
+                          f"to test (see leakage_filter_reassigned_to_test_peptide_ids in split_indices.json) "
+                          f"rather than left unassigned.")
+        log_lines.append(f"Final split: {len(train_ids)} train peptides / {len(test_ids)} test peptides")
         log_lines.append(f"  train rows: {n_train_rows}, test rows: {n_test_rows}")
+        log_lines.append(f"Reconciliation check: train + test == unique peptides? "
+                          f"{len(train_ids)} + {len(test_ids)} = {len(train_ids) + len(test_ids)} "
+                          f"(unique peptides = {len(peptide_ids)}) -> "
+                          f"{'OK' if len(train_ids) + len(test_ids) == len(peptide_ids) else 'MISMATCH -- INVESTIGATE'}")
+        overlap = train_id_set & test_id_set
+        log_lines.append(f"Train/test overlap check: {len(overlap)} peptide_ids in both "
+                          f"-> {'OK' if not overlap else 'MISMATCH -- INVESTIGATE'}")
 
     log_lines.append("")
     log_lines.append(f"Final dataset: {FINAL_CSV}")
