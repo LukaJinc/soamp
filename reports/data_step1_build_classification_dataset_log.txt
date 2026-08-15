@@ -1,0 +1,7 @@
+=== Data step 1: classification dataset assembly ===
+Included labels: ['active', 'inactive']
+Output rows: 24630
+Organisms in scope: ['Escherichia coli', 'Pseudomonas aeruginosa', 'Staphylococcus aureus']
+Label distribution: {'active': 20736, 'inactive': 3894}
+Split distribution: {'train': 17043, 'test': 7587}
+Wrote /Users/lukajin/PycharmProjects/soamp/data/mic_classification_dataset.csv

@@ -1,0 +1,33 @@
+{
+  "name": "dataset_model_ready",
+  "type": "dataset",
+  "metadata": {
+    "n_rows": 24630,
+    "organisms": [
+      "Escherichia coli",
+      "Pseudomonas aeruginosa",
+      "Staphylococcus aureus"
+    ],
+    "label_counts": {
+      "active": 20736,
+      "inactive": 3894
+    },
+    "split_counts": {
+      "train": 17043,
+      "test": 7587
+    }
+  },
+  "depends_on": [
+    "dataset_validated",
+    "labels_threshold_derived",
+    "splits_v1"
+  ],
+  "files": [
+    {
+      "path": "/Users/lukajin/PycharmProjects/soamp/data/mic_classification_dataset.csv",
+      "sha256": "00dec17f5593b649d4ea32df4a6936e11485a4eb7856b558ec8690c804f75e8a",
+      "bytes": 10269291
+    }
+  ],
+  "logged_at": 1786814903.933332
+}

@@ -1,0 +1,33 @@
+{
+  "name": "features_peptide",
+  "type": "features",
+  "metadata": {
+    "descriptor_names": [
+      "MolWt",
+      "TPSA",
+      "MolLogP",
+      "NumHDonors",
+      "NumHAcceptors",
+      "NumRotatableBonds",
+      "FractionCSP3",
+      "RingCount",
+      "NumAromaticRings",
+      "HeavyAtomCount",
+      "NumHeteroatoms",
+      "LabuteASA",
+      "FormalCharge"
+    ],
+    "n_unique_peptides": 12371
+  },
+  "depends_on": [
+    "dataset_model_ready"
+  ],
+  "files": [
+    {
+      "path": "/Users/lukajin/PycharmProjects/soamp/data/peptide_features.csv",
+      "sha256": "38f3eb6cbb8e7efc9ae816214aea659e698a906b977a16799b222753c8e47144",
+      "bytes": 1452668
+    }
+  ],
+  "logged_at": 1786815028.490428
+}

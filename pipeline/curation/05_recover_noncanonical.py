@@ -19,18 +19,38 @@ Output: data/recovered_peptides.csv (peptide_id, sequence, smiles, recovered_via
 recovery_category, nterminus, cterminus, bond_types, has_noncanonical), plus
 reports/step4_recovery_log.txt with full before/after counts by reason.
 """
+import argparse
 import os
 import json
 import csv
 from collections import Counter
 
+from dotenv import load_dotenv
+
+from soamp.common.tracking import build_tracker
+from soamp.curation.config import CurationConfig
 from soamp.curation.parse_dbaasp import DBAASPPeptide
 from soamp.curation.smiles_gen import generate_smiles
+from soamp.utils.config import load_config
 
-RAW_JSONL = os.path.join(os.path.dirname(__file__), "..", "..", ".cache", "dbaasp_raw.jsonl")
-DIFF_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "dbaasp_vs_qmap_diff.csv")
-OUT_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "recovered_peptides.csv")
-LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "reports", "step4_recovery_log.txt")
+
+load_dotenv()
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", default="config/curation/base.yaml")
+    return parser.parse_args()
+
+
+ARGS = _parse_args()
+CFG = load_config(ARGS.config, CurationConfig)
+RAW_JSONL = CFG.paths.cache_dir / "dbaasp_raw.jsonl"
+DIFF_CSV = CFG.paths.data_dir / "dbaasp_vs_qmap_diff.csv"
+OUT_CSV = CFG.paths.data_dir / "recovered_peptides.csv"
+LOG_PATH = CFG.paths.reports_dir / "step4_recovery_log.txt"
+UNCONVERTIBLE_CSV = CFG.paths.data_dir / "unconvertible_peptides.csv"
+TRACKER = build_tracker(CFG.tracking, CFG.paths.tracking_dir)
 
 BUCKET_TO_CATEGORY = {
     "b2_excluded_unsupported_terminus": "terminus_based",
@@ -41,6 +61,8 @@ BUCKET_TO_CATEGORY = {
 
 
 def main():
+    TRACKER.log_config(CFG.model_dump(mode="json"))
+
     raw_peptides = {}
     with open(RAW_JSONL) as f:
         for line in f:
@@ -121,11 +143,19 @@ def main():
         writer.writeheader()
         writer.writerows(recovered)
 
-    unconv_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "unconvertible_peptides.csv")
+    unconv_path = UNCONVERTIBLE_CSV
     with open(unconv_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(unconvertible[0].keys()))
         writer.writeheader()
         writer.writerows(unconvertible)
+
+    TRACKER.log_artifact(
+        name="dataset_recovered", artifact_type="dataset",
+        paths=[OUT_CSV, UNCONVERTIBLE_CSV],
+        metadata={"n_recovered": len(recovered), "n_unconvertible": len(unconvertible),
+                  "recovered_via": dict(recovered_via_counter)},
+        depends_on=["dataset_curated"],
+    )
 
     log_lines = []
     log_lines.append("=== Step 4: recovery of non-canonical/cyclic peptides excluded from QMAP ===")
@@ -153,6 +183,7 @@ def main():
     with open(LOG_PATH, "w") as f:
         f.write("\n".join(log_lines) + "\n")
     print("\n".join(log_lines))
+    TRACKER.close()
 
 
 if __name__ == "__main__":

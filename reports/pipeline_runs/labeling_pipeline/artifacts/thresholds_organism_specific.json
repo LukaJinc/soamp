@@ -1,0 +1,17 @@
+{
+  "name": "thresholds_organism_specific",
+  "type": "config",
+  "metadata": {
+    "n_species_thresholds": 3,
+    "n_genus_thresholds": 0
+  },
+  "depends_on": [],
+  "files": [
+    {
+      "path": "/Users/lukajin/PycharmProjects/soamp/config/thresholds/organism_thresholds.csv",
+      "sha256": "c00cb1319cc4260eef49254ffe4d08712c612bf5f977fe88157fffea85a41fea",
+      "bytes": 26089
+    }
+  ],
+  "logged_at": 1786814855.639152
+}

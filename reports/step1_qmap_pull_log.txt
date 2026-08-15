@@ -29,7 +29,7 @@ Bond type counts (peptide-level, DSB/AMD only per QMAP filter):
 
 MIC unit: uM for all 'targets' entries (QMAP's target_base.py converts ug/mL -> uM via computed molecular weight before this file is produced; confirmed by reading QMAP source, no unit field is stored in this flattened export so this is a methodology-level confirmation, not a per-row field).
 Unique organisms across all (peptide, organism) MIC rows: 492
-Total (peptide, organism) MIC rows written to /Users/lukajin/PycharmProjects/soamp/scripts/../data/qmap_included.csv: 62729
+Total (peptide, organism) MIC rows written to /Users/lukajin/PycharmProjects/soamp/data/qmap_included.csv: 62729
 Peptides with zero bacterial MIC targets (present in QMAP's 18,033 but contribute 0 rows to the flattened regression table -- e.g. hemolysis-only entries or species that didn't pass QMAP's Bacteria/MIC/unit filters): 4272
 
 MANUAL REVIEW FLAGS (1):

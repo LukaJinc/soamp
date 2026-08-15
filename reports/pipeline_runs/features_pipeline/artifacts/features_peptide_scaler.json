@@ -1,0 +1,34 @@
+{
+  "name": "features_peptide_scaler",
+  "type": "features",
+  "metadata": {
+    "descriptor_names": [
+      "MolWt",
+      "TPSA",
+      "MolLogP",
+      "NumHDonors",
+      "NumHAcceptors",
+      "NumRotatableBonds",
+      "FractionCSP3",
+      "RingCount",
+      "NumAromaticRings",
+      "HeavyAtomCount",
+      "NumHeteroatoms",
+      "LabuteASA",
+      "FormalCharge"
+    ],
+    "n_peptides_fit": 8583
+  },
+  "depends_on": [
+    "dataset_model_ready",
+    "features_peptide"
+  ],
+  "files": [
+    {
+      "path": "/Users/lukajin/PycharmProjects/soamp/data/peptide_feature_scaler.json",
+      "sha256": "cec05d6af518124ad34ffac238cefb06797ffab0a521913de1269a587f631930",
+      "bytes": 988
+    }
+  ],
+  "logged_at": 1786815030.2018392
+}

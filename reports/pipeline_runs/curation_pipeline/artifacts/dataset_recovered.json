@@ -1,0 +1,30 @@
+{
+  "name": "dataset_recovered",
+  "type": "dataset",
+  "metadata": {
+    "n_recovered": 2870,
+    "n_unconvertible": 3541,
+    "recovered_via": {
+      "native_dbaasp_smiles": 2853,
+      "p2smi_generated(linear)": 11,
+      "p2smi_generated(SS)": 3,
+      "p2smi_generated(HT)": 3
+    }
+  },
+  "depends_on": [
+    "dataset_curated"
+  ],
+  "files": [
+    {
+      "path": "/Users/lukajin/PycharmProjects/soamp/data/recovered_peptides.csv",
+      "sha256": "6fdaccc314865aacbc7b7cb8e416b863134dfe59dbc2af431bbd01a93508e96d",
+      "bytes": 939164
+    },
+    {
+      "path": "/Users/lukajin/PycharmProjects/soamp/data/unconvertible_peptides.csv",
+      "sha256": "6b0b6a1321cffb94d2e23f93a04d02043d0eee2d6b855ee51dc1883429a55f2e",
+      "bytes": 827290
+    }
+  ],
+  "logged_at": 1786814569.98402
+}

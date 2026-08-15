@@ -1,0 +1,18 @@
+{
+  "name": "raw_qmap",
+  "type": "raw",
+  "metadata": {
+    "n_peptides": 18033,
+    "n_rows": 62729,
+    "n_unique_organisms": 492
+  },
+  "depends_on": [],
+  "files": [
+    {
+      "path": "/Users/lukajin/PycharmProjects/soamp/data/qmap_included.csv",
+      "sha256": "9af018ad46f486c2ace351e705c298befcf26eccc5751697cbb4f7cf83ff4f48",
+      "bytes": 44126643
+    }
+  ],
+  "logged_at": 1786814406.293979
+}

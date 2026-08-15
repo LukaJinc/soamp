@@ -1,0 +1,22 @@
+{
+  "name": "splits_v1",
+  "type": "split",
+  "metadata": {
+    "identity_threshold": 0.6,
+    "test_size": 0.2,
+    "n_train": 11114,
+    "n_test": 4790,
+    "n_reassigned_leakage_filter": 1414
+  },
+  "depends_on": [
+    "dataset_validated"
+  ],
+  "files": [
+    {
+      "path": "/Users/lukajin/PycharmProjects/soamp/data/split_indices.json",
+      "sha256": "431cf5af53aa152fbc77aa4e4a3534bbfae5e53ddd6111c81cf9014afec794f5",
+      "bytes": 218051
+    }
+  ],
+  "logged_at": 1786814701.1601439
+}

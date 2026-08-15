@@ -28,23 +28,43 @@ preserves the independence guarantee -- and records the reassignment separately
 in split_indices.json and in this step's log, so the gap can never again go
 unnoticed.
 """
+import argparse
 import os
 import csv
 import json
 
-STEP5_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "step5_standardized_mic.csv")
-FINAL_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "final_mic_regression_dataset.csv")
-SPLIT_JSON = os.path.join(os.path.dirname(__file__), "..", "..", "data", "split_indices.json")
-LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "reports", "step6_final_split_log.txt")
+from dotenv import load_dotenv
+
+from soamp.common.tracking import build_tracker
+from soamp.curation.config import CurationConfig
+from soamp.utils.config import load_config
+
+
+load_dotenv()
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", default="config/curation/base.yaml")
+    return parser.parse_args()
+
+
+ARGS = _parse_args()
+CFG = load_config(ARGS.config, CurationConfig)
+STEP5_CSV = CFG.paths.data_dir / "step5_standardized_mic.csv"
+FINAL_CSV = CFG.paths.data_dir / "final_mic_regression_dataset.csv"
+SPLIT_JSON = CFG.paths.data_dir / "split_indices.json"
+LOG_PATH = CFG.paths.reports_dir / "step6_final_split_log.txt"
+TRACKER = build_tracker(CFG.tracking, CFG.paths.tracking_dir)
 
 FINAL_FIELDNAMES = [
     "peptide_id", "sequence", "smiles", "organism", "ncbi_taxon_id_if_available",
     "mic_value_uM", "mic_type", "source", "has_noncanonical", "bond_type", "molecular_weight",
 ]
 
-RANDOM_SEED = 42
-IDENTITY_THRESHOLD = 0.60
-TEST_SIZE = 0.2
+RANDOM_SEED = CFG.split.random_seed
+IDENTITY_THRESHOLD = CFG.split.identity_threshold
+TEST_SIZE = CFG.split.test_size
 
 POST_FILTERING_NOTE = (
     "qmap.toolkit.train_test_split's post_filtering=True (the library default, used here) "
@@ -58,6 +78,8 @@ POST_FILTERING_NOTE = (
 
 
 def main():
+    TRACKER.log_config(CFG.model_dump(mode="json"))
+
     with open(STEP5_CSV) as f:
         rows = list(csv.DictReader(f))
 
@@ -105,13 +127,21 @@ def main():
     log_lines.append(f"  unique peptides source=qmap_original: {uniq_qmap}")
     log_lines.append(f"  unique peptides source=recovered: {uniq_recovered}")
 
+    dataset_validated_artifact = TRACKER.log_artifact(
+        name="dataset_validated", artifact_type="dataset",
+        paths=[FINAL_CSV],
+        metadata={"n_rows": len(final_rows), "n_unique_peptides": len(peptide_ids),
+                  "n_qmap": n_qmap, "n_recovered": n_recovered},
+        depends_on=["dataset_curated", "dataset_recovered"],
+    )
+
     dropped_ids = []
     try:
         from qmap.toolkit import train_test_split
         train_seqs, test_seqs, train_ids, test_ids = train_test_split(
             sequences, peptide_ids,
             threshold=IDENTITY_THRESHOLD, test_size=TEST_SIZE,
-            random_state=RANDOM_SEED, verbose=True,
+            random_state=RANDOM_SEED, post_filtering=CFG.split.post_filtering, verbose=True,
         )
         split_ok = True
 
@@ -142,7 +172,7 @@ def main():
         "test_size": TEST_SIZE,
         "random_state": RANDOM_SEED,
         "split_level": "unique peptide_id (all organism rows for a peptide share its split assignment)",
-        "post_filtering": True,
+        "post_filtering": CFG.split.post_filtering,
         "post_filtering_note": POST_FILTERING_NOTE if split_ok else "",
         "leakage_filter_reassigned_to_test_peptide_ids": [str(x) for x in dropped_ids],
         "train_peptide_ids": [str(x) for x in train_ids],
@@ -150,6 +180,15 @@ def main():
     }
     with open(SPLIT_JSON, "w") as f:
         json.dump(split_indices, f, indent=2)
+
+    TRACKER.log_artifact(
+        name="splits_v1", artifact_type="split",
+        paths=[SPLIT_JSON],
+        metadata={"identity_threshold": IDENTITY_THRESHOLD, "test_size": TEST_SIZE,
+                  "n_train": len(train_ids), "n_test": len(test_ids),
+                  "n_reassigned_leakage_filter": len(dropped_ids)},
+        depends_on=[dataset_validated_artifact],
+    )
 
     if split_ok:
         n_train_rows = sum(1 for r in final_rows if r["peptide_id"] in train_id_set)
@@ -179,6 +218,7 @@ def main():
     with open(LOG_PATH, "w") as f:
         f.write("\n".join(log_lines) + "\n")
     print("\n".join(log_lines))
+    TRACKER.close()
 
 
 if __name__ == "__main__":

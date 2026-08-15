@@ -25,21 +25,42 @@ See qmap_filter.py's module docstring for the important finding that
 reason -- so there is no separate bucket for it here (it would fall through to
 in_both or b5, not a residue-based bucket).
 """
+import argparse
 import os
 import json
 import csv
 from collections import Counter
 
+from dotenv import load_dotenv
+
+from soamp.common.tracking import build_tracker
+from soamp.curation.config import CurationConfig
 from soamp.curation.parse_dbaasp import DBAASPPeptide
 from soamp.curation.qmap_filter import qmap_inclusion_check
+from soamp.utils.config import load_config
 
-RAW_JSONL = os.path.join(os.path.dirname(__file__), "..", "..", ".cache", "dbaasp_raw.jsonl")
-QMAP_JSON = os.path.join(os.path.dirname(__file__), "..", "..", ".cache", "qmap_hf", "dbaasp.json")
-OUT_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "dbaasp_vs_qmap_diff.csv")
-LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "reports", "step3_diff_log.txt")
+
+load_dotenv()
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", default="config/curation/base.yaml")
+    return parser.parse_args()
+
+
+ARGS = _parse_args()
+CFG = load_config(ARGS.config, CurationConfig)
+RAW_JSONL = CFG.paths.cache_dir / "dbaasp_raw.jsonl"
+QMAP_JSON = CFG.paths.cache_dir / "qmap_hf" / "dbaasp.json"
+OUT_CSV = CFG.paths.data_dir / "dbaasp_vs_qmap_diff.csv"
+LOG_PATH = CFG.paths.reports_dir / "step3_diff_log.txt"
+TRACKER = build_tracker(CFG.tracking, CFG.paths.tracking_dir)
 
 
 def main():
+    TRACKER.log_config(CFG.model_dump(mode="json"))
+
     with open(QMAP_JSON) as f:
         qmap_data = json.load(f)
     qmap_ids = {e["id"]: e for e in qmap_data}
@@ -130,6 +151,14 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
 
+    TRACKER.log_artifact(
+        name="dataset_curated", artifact_type="dataset",
+        paths=[OUT_CSV],
+        metadata={"n_raw_peptides": len(raw_peptides), "n_qmap_peptides": len(qmap_ids),
+                  "bucket_counts": dict(bucket_counter)},
+        depends_on=["raw_dbaasp", "raw_qmap"],
+    )
+
     log_lines = []
     log_lines.append("=== Step 3: DBAASP raw pull vs QMAP included set -- diff ===")
     log_lines.append(f"Join key: DBAASP integer peptide id (native to both datasets)")
@@ -168,6 +197,7 @@ def main():
     with open(LOG_PATH, "w") as f:
         f.write("\n".join(log_lines) + "\n")
     print("\n".join(log_lines))
+    TRACKER.close()
 
 
 if __name__ == "__main__":

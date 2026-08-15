@@ -1,6 +1,6 @@
 # Curation audit report: SMILES-based AMP MIC regression dataset
 
-Generated: 2026-08-10
+Generated: 2026-08-15
 
 ## Overview
 
@@ -44,7 +44,7 @@ Bond type counts (peptide-level, DSB/AMD only per QMAP filter):
 
 MIC unit: uM for all 'targets' entries (QMAP's target_base.py converts ug/mL -> uM via computed molecular weight before this file is produced; confirmed by reading QMAP source, no unit field is stored in this flattened export so this is a methodology-level confirmation, not a per-row field).
 Unique organisms across all (peptide, organism) MIC rows: 492
-Total (peptide, organism) MIC rows written to /Users/lukajin/PycharmProjects/soamp/scripts/../data/qmap_included.csv: 62729
+Total (peptide, organism) MIC rows written to /Users/lukajin/PycharmProjects/soamp/data/qmap_included.csv: 62729
 Peptides with zero bacterial MIC targets (present in QMAP's 18,033 but contribute 0 rows to the flattened regression table -- e.g. hemolysis-only entries or species that didn't pass QMAP's Bacteria/MIC/unit filters): 4272
 
 MANUAL REVIEW FLAGS (1):
@@ -81,14 +81,11 @@ Crawl mechanics: concurrent requests via a thread pool. An initial run at 50 con
 
 ```
 DBAASP crawl summary
-IDs attempted: 12756 (1..24707)
-ok (200): 12492
+IDs attempted: 263 (1..24707)
+ok (200): 0
 not_found (400, gap/deleted id): 263
-error (network/timeout/5xx after retries): 1
-elapsed_seconds: 879.9
-
-Error details (id, message):
-  8244: HTTPSConnectionPool(host='dbaasp.org', port=443): Read timed out. (read timeout=20)
+error (network/timeout/5xx after retries): 0
+elapsed_seconds: 3.4
 ```
 
 ```
@@ -1183,8 +1180,8 @@ Unconvertible reason summary (top-level, truncated):
   unsupported N-terminal modification 'C14': 18
   unrecognized DBAASP cycleType='LCN': 18
 
-Full recovered list: /Users/lukajin/PycharmProjects/soamp/scripts/../data/recovered_peptides.csv
-Full unconvertible list (with per-entry reason): /Users/lukajin/PycharmProjects/soamp/scripts/../data/unconvertible_peptides.csv
+Full recovered list: /Users/lukajin/PycharmProjects/soamp/data/recovered_peptides.csv
+Full unconvertible list (with per-entry reason): /Users/lukajin/PycharmProjects/soamp/data/unconvertible_peptides.csv
 ```
 
 ## Step 5 -- Assay filtering and unit standardization
@@ -1254,8 +1251,8 @@ Final split: 11114 train peptides / 4790 test peptides
 Reconciliation check: train + test == unique peptides? 11114 + 4790 = 15904 (unique peptides = 15904) -> OK
 Train/test overlap check: 0 peptide_ids in both -> OK
 
-Final dataset: /Users/lukajin/PycharmProjects/soamp/scripts/../data/final_mic_regression_dataset.csv
-Split indices: /Users/lukajin/PycharmProjects/soamp/scripts/../data/split_indices.json
+Final dataset: /Users/lukajin/PycharmProjects/soamp/data/final_mic_regression_dataset.csv
+Split indices: /Users/lukajin/PycharmProjects/soamp/data/split_indices.json
 ```
 
 ## Final dataset composition

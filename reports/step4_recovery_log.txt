@@ -49,5 +49,5 @@ Unconvertible reason summary (top-level, truncated):
   unsupported N-terminal modification 'C14': 18
   unrecognized DBAASP cycleType='LCN': 18
 
-Full recovered list: /Users/lukajin/PycharmProjects/soamp/scripts/../data/recovered_peptides.csv
-Full unconvertible list (with per-entry reason): /Users/lukajin/PycharmProjects/soamp/scripts/../data/unconvertible_peptides.csv
+Full recovered list: /Users/lukajin/PycharmProjects/soamp/data/recovered_peptides.csv
+Full unconvertible list (with per-entry reason): /Users/lukajin/PycharmProjects/soamp/data/unconvertible_peptides.csv

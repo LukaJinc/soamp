@@ -1,0 +1,9 @@
+{
+  "unknown_index": 0,
+  "vocab": {
+    "Escherichia coli": 1,
+    "Pseudomonas aeruginosa": 2,
+    "Staphylococcus aureus": 3
+  },
+  "vocab_size": 4
+}

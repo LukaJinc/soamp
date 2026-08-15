@@ -1,0 +1,41 @@
+paths:
+  data_dir: data
+  reports_dir: reports
+  checkpoint_dir: reports/checkpoints
+  tracking_dir: reports/train_runs
+
+input_files:
+  classification_dataset_filename: mic_classification_dataset.csv
+  peptide_features_filename: peptide_features.csv
+  organism_vocab_filename: organism_vocab.json
+  peptide_feature_scaler_filename: peptide_feature_scaler.json
+
+split:
+  val_fraction: 0.1
+
+model:
+  organism_embed_dim: 8
+  hidden_dims: [32, 16]
+
+optim:
+  learning_rate: 0.001
+  weight_decay: 0.0
+
+class_balancing:
+  mode: auto
+  fixed_pos_weight: null
+
+loop:
+  epochs: 30
+  batch_size: 256
+  seed: 42
+  num_dataloader_workers: 0
+
+checkpoint:
+  save_every_n_epochs: 5
+  best_metric: val_auroc
+
+tracking:
+  exp_id: baseline_mlp_v1
+  backend: local
+  wandb_project: soamp

@@ -1,0 +1,20 @@
+{
+  "name": "raw_dbaasp",
+  "type": "raw",
+  "metadata": {
+    "n_ok": 0,
+    "n_not_found": 263,
+    "n_error": 0,
+    "max_id": 24207,
+    "id_margin": 500
+  },
+  "depends_on": [],
+  "files": [
+    {
+      "path": "/Users/lukajin/PycharmProjects/soamp/.cache/dbaasp_raw.jsonl",
+      "sha256": "c7b5190d0feff8b72eda384316a3b2ba039ddfbd2684edcd29562064b07833d1",
+      "bytes": 212632281
+    }
+  ],
+  "logged_at": 1786814324.849979
+}

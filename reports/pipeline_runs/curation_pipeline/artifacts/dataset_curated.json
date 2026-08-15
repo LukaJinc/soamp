@@ -1,0 +1,29 @@
+{
+  "name": "dataset_curated",
+  "type": "dataset",
+  "metadata": {
+    "n_raw_peptides": 24444,
+    "n_qmap_peptides": 18033,
+    "bucket_counts": {
+      "b2_excluded_unsupported_terminus": 2565,
+      "in_both": 18033,
+      "b3_excluded_residue_no_smiles": 1428,
+      "b1_excluded_non_monomer": 664,
+      "b5_excluded_unexplained": 1619,
+      "b4_excluded_nonstandard_bond": 135,
+      "c_in_qmap_not_in_raw_pull": 0
+    }
+  },
+  "depends_on": [
+    "raw_dbaasp",
+    "raw_qmap"
+  ],
+  "files": [
+    {
+      "path": "/Users/lukajin/PycharmProjects/soamp/data/dbaasp_vs_qmap_diff.csv",
+      "sha256": "68f1d7c2e1443529e2f9b862aa8d35c1074b2cad0cbeaf02139655da58f0b7a0",
+      "bytes": 1847848
+    }
+  ],
+  "logged_at": 1786814514.837064
+}

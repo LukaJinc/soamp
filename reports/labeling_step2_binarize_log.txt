@@ -1,0 +1,6 @@
+=== Labeling step 2: MIC binarization ===
+Total rows: 72587
+Threshold match level breakdown: {'species': 33840, 'none': 38747}
+Threshold coverage: 33840/72587 (46.6%)
+Label distribution: {'uncertain': 9210, 'unlabeled': 38747, 'active': 20736, 'inactive': 3894}
+Wrote /Users/lukajin/PycharmProjects/soamp/data/mic_activity_labels.csv

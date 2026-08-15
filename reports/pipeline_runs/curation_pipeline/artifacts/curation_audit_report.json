@@ -1,0 +1,24 @@
+{
+  "name": "curation_audit_report",
+  "type": "report",
+  "metadata": {
+    "n_final_rows": 72587,
+    "n_unique_peptides": 15904,
+    "source_counts": {
+      "recovered": 10256,
+      "qmap_original": 62331
+    }
+  },
+  "depends_on": [
+    "dataset_validated",
+    "splits_v1"
+  ],
+  "files": [
+    {
+      "path": "/Users/lukajin/PycharmProjects/soamp/reports/curation_audit.md",
+      "sha256": "a92f7eae483139cbd37b3292f7ee1db2592d3f6fb9ff8cf66eab6b250e2b2598",
+      "bytes": 34998
+    }
+  ],
+  "logged_at": 1786814750.947602
+}

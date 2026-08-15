@@ -1,0 +1,36 @@
+paths:
+  data_dir: data
+  reports_dir: reports
+  tracking_dir: reports/pipeline_runs
+
+input_files:
+  classification_dataset_filename: mic_classification_dataset.csv
+
+descriptors:
+  names:
+    - MolWt
+    - TPSA
+    - MolLogP
+    - NumHDonors
+    - NumHAcceptors
+    - NumRotatableBonds
+    - FractionCSP3
+    - RingCount
+    - NumAromaticRings
+    - HeavyAtomCount
+    - NumHeteroatoms
+    - LabuteASA
+    - FormalCharge
+
+organism_vocab:
+  unknown_index: 0
+
+output_files:
+  peptide_features_filename: peptide_features.csv
+  organism_vocab_filename: organism_vocab.json
+  peptide_feature_scaler_filename: peptide_feature_scaler.json
+
+tracking:
+  exp_id: features_pipeline
+  backend: local
+  wandb_project: soamp

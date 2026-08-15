@@ -4,15 +4,34 @@ a fresh pass over the final dataset for per-organism counts. Every number in thi
 report is either read back from a prior step's log or recomputed directly from
 data/final_mic_regression_dataset.csv -- nothing here is hand-entered.
 """
+import argparse
 import os
 import csv
 from collections import Counter
 from datetime import date
 
-BASE = os.path.join(os.path.dirname(__file__), "..", "..")
-REPORTS = os.path.join(BASE, "reports")
-DATA = os.path.join(BASE, "data")
-OUT_MD = os.path.join(REPORTS, "curation_audit.md")
+from dotenv import load_dotenv
+
+from soamp.common.tracking import build_tracker
+from soamp.curation.config import CurationConfig
+from soamp.utils.config import load_config
+
+
+load_dotenv()
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", default="config/curation/base.yaml")
+    return parser.parse_args()
+
+
+ARGS = _parse_args()
+CFG = load_config(ARGS.config, CurationConfig)
+REPORTS = CFG.paths.reports_dir
+DATA = CFG.paths.data_dir
+OUT_MD = REPORTS / "curation_audit.md"
+TRACKER = build_tracker(CFG.tracking, CFG.paths.tracking_dir)
 
 
 def read_log(name):
@@ -24,6 +43,8 @@ def read_log(name):
 
 
 def main():
+    TRACKER.log_config(CFG.model_dump(mode="json"))
+
     final_rows = []
     final_csv_path = os.path.join(DATA, "final_mic_regression_dataset.csv")
     if os.path.exists(final_csv_path):
@@ -48,13 +69,13 @@ def main():
     step5 = read_log("step5_assay_unit_log.txt")
     step6 = read_log("step6_final_split_log.txt")
 
-    crawl_log_path = os.path.join(BASE, ".cache", "dbaasp_crawl_log.txt")
+    crawl_log_path = CFG.paths.cache_dir / "dbaasp_crawl_log.txt"
     crawl_log = ""
     if os.path.exists(crawl_log_path):
         with open(crawl_log_path) as f:
             crawl_log = f.read()
 
-    raw_jsonl_path = os.path.join(BASE, ".cache", "dbaasp_raw.jsonl")
+    raw_jsonl_path = CFG.paths.cache_dir / "dbaasp_raw.jsonl"
     n_unique_fetched = 0
     if os.path.exists(raw_jsonl_path):
         import json as _json
@@ -265,6 +286,15 @@ def main():
     with open(OUT_MD, "w") as f:
         f.write("\n".join(md) + "\n")
     print(f"Wrote {OUT_MD}")
+
+    TRACKER.log_artifact(
+        name="curation_audit_report", artifact_type="report",
+        paths=[OUT_MD],
+        metadata={"n_final_rows": len(final_rows), "n_unique_peptides": unique_peptides,
+                  "source_counts": dict(source_counter)},
+        depends_on=["dataset_validated", "splits_v1"],
+    )
+    TRACKER.close()
 
 
 if __name__ == "__main__":

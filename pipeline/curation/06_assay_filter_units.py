@@ -22,23 +22,42 @@ values are converted to uM via the peptide's RDKit molecular weight, and
 multiple measurements for the same (peptide, species) pair are IQR-outlier-
 filtered and averaged (matching QMAP's method, units/get_iqr port).
 """
+import argparse
 import os
 import json
 import csv
 import math
 from collections import defaultdict, Counter
 
+from dotenv import load_dotenv
+
+from soamp.common.tracking import build_tracker
+from soamp.curation.config import CurationConfig
 from soamp.curation.parse_dbaasp import DBAASPPeptide
 from soamp.curation.smiles_gen import generate_smiles
 from soamp.curation.units import parse_activity, classify_censoring, compute_smiles_weight, ug_ml_to_uM, precision
 from soamp.curation.taxonomy import classify_species
+from soamp.utils.config import load_config
 import numpy as np
 
-RAW_JSONL = os.path.join(os.path.dirname(__file__), "..", "..", ".cache", "dbaasp_raw.jsonl")
-DIFF_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "dbaasp_vs_qmap_diff.csv")
-RECOVERED_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "recovered_peptides.csv")
-OUT_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "step5_standardized_mic.csv")
-LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "reports", "step5_assay_unit_log.txt")
+
+load_dotenv()
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", default="config/curation/base.yaml")
+    return parser.parse_args()
+
+
+ARGS = _parse_args()
+CFG = load_config(ARGS.config, CurationConfig)
+RAW_JSONL = CFG.paths.cache_dir / "dbaasp_raw.jsonl"
+DIFF_CSV = CFG.paths.data_dir / "dbaasp_vs_qmap_diff.csv"
+RECOVERED_CSV = CFG.paths.data_dir / "recovered_peptides.csv"
+OUT_CSV = CFG.paths.data_dir / "step5_standardized_mic.csv"
+LOG_PATH = CFG.paths.reports_dir / "step5_assay_unit_log.txt"
+TRACKER = build_tracker(CFG.tracking, CFG.paths.tracking_dir)
 
 
 def get_iqr(values):
@@ -58,6 +77,8 @@ def resolve_smiles_for_peptide(p: DBAASPPeptide):
 
 
 def main():
+    TRACKER.log_config(CFG.model_dump(mode="json"))
+
     raw_peptides = {}
     with open(RAW_JSONL) as f:
         for line in f:
@@ -259,6 +280,7 @@ def main():
     with open(LOG_PATH, "w") as f:
         f.write("\n".join(log_lines) + "\n")
     print("\n".join(log_lines))
+    TRACKER.close()
 
 
 if __name__ == "__main__":

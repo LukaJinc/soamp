@@ -1,0 +1,17 @@
+{
+  "paths": {
+    "cache_dir": "/Users/lukajin/PycharmProjects/soamp/.cache",
+    "data_dir": "/Users/lukajin/PycharmProjects/soamp/data",
+    "reports_dir": "/Users/lukajin/PycharmProjects/soamp/reports",
+    "thresholds_dir": "/Users/lukajin/PycharmProjects/soamp/config/thresholds",
+    "tracking_dir": "/Users/lukajin/PycharmProjects/soamp/reports/pipeline_runs"
+  },
+  "threshold_table": {
+    "filename": "organism_thresholds.csv"
+  },
+  "tracking": {
+    "exp_id": "labeling_pipeline",
+    "backend": "local",
+    "wandb_project": "soamp"
+  }
+}

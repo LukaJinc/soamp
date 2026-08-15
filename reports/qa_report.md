@@ -1,6 +1,6 @@
 # QA report: SMILES-based AMP MIC regression dataset
 
-Generated: 2026-08-07
+Generated: 2026-08-15
 
 Independent audit of `scripts/01-08_*.py`'s outputs (`data/*.csv`, `reports/curation_audit.md`). Deliberately avoids importing the pipeline's own filter/unit-conversion logic (`scripts/common/units.py`, `scripts/06_assay_filter_units.py`) so a bug there would actually be caught -- see `scripts/qa/qa_common.py` for the two disclosed exceptions.
 
@@ -14,8 +14,9 @@ Independent audit of `scripts/01-08_*.py`'s outputs (`data/*.csv`, `reports/cura
 | 4 | Independent MIC/Bacteria filter verification | **PASS** |
 | 5 | Train/test split integrity | **PASS** |
 | 6 | Row-level sanity & documented-caveat checks | **PASS** |
+| 7 | Threshold coverage & labeling correctness | **FLAGGED** |
 
-**Overall: PASS**
+**Overall: FLAGGED**
 
 ## Section 1: Coverage vs QMAP baseline -- PASS
 
@@ -63,16 +64,16 @@ Independent audit of `scripts/01-08_*.py`'s outputs (`data/*.csv`, `reports/cura
 
 | peptide_id |
 |---|
-| 6445 |
-| 21496 |
-| 23527 |
-| 20448 |
-| 6564 |
-| 21625 |
-| 7427 |
-| 19327 |
-| 2468 |
-| 6305 |
+| 21607 |
+| 11719 |
+| 8325 |
+| 23463 |
+| 19211 |
+| 21709 |
+| 24631 |
+| 11294 |
+| 4237 |
+| 15772 |
 
 ## Section 2: SMILES structural integrity -- PASS
 
@@ -147,4 +148,61 @@ Train set: **11,114** peptide_ids (audit claims 11,114). Test set: **4,790** pep
 | n_mic_type_inconsistent | 0 |
 | n_groups_multi_recomputed | 15456 |
 | flag_21052_status | as_expected |
+
+## Section 7: Threshold coverage & labeling correctness -- FLAGGED
+
+**Table structure:** 658 rows (3 species + 0 genus breakpoints filled in), 0 duplicate keys, 0 bad levels, 0 unparseable thresholds, 0 partial fills, 0 reversed breakpoints.
+**Threshold coverage:** 33,840/72,587 (46.6%) of dataset rows resolve to a breakpoint (breakdown: {'species': 33840, 'genus': 0, 'none': 38747}).
+**Label distribution:** {'uncertain': 9210, 'unlabeled': 38747, 'active': 20736, 'inactive': 3894}.
+**Independent re-derivation cross-check:** 0 threshold_match_level mismatches, 0 label mismatches out of 72,587 rows.
+**Censor-direction recovery:** 18,323/18,323 mic_type='censored' rows in the final dataset successfully recovered bounds (18,323 rows in mic_censor_direction.csv total).
+
+**Metrics:**
+
+| metric | value |
+|---|---|
+| n_threshold_rows | 658 |
+| n_species_filled | 3 |
+| n_genus_filled | 0 |
+| n_dup_keys | 0 |
+| n_bad_level | 0 |
+| n_bad_threshold | 0 |
+| n_partial_fill | 0 |
+| n_reversed | 0 |
+| n_covered | 33840 |
+| n_total | 72587 |
+| coverage_pct | 46.6 |
+| n_threshold_match_level_mismatches | 0 |
+| n_label_mismatches | 0 |
+| n_censored_recovered | 18323 |
+| n_censored_final | 18323 |
+
+**Highest-impact species still missing a threshold (top 20):**
+
+| match_key | n_dataset_rows |
+|---|---|
+| Bacillus subtilis | 3888 |
+| Klebsiella pneumoniae | 3780 |
+| Staphylococcus epidermidis | 3133 |
+| Acinetobacter baumannii | 3098 |
+| Enterococcus faecalis | 2497 |
+| Salmonella enterica | 2193 |
+| Micrococcus luteus | 1338 |
+| Enterococcus faecium | 1117 |
+| Salmonella typhimurium | 1013 |
+| Bacillus cereus | 814 |
+| Listeria monocytogenes | 759 |
+| Enterobacter cloacae | 618 |
+| Bacillus megaterium | 467 |
+| Pseudomonas syringae | 408 |
+| Streptococcus pyogenes | 379 |
+| Proteus mirabilis | 346 |
+| Streptococcus pneumoniae | 340 |
+| Streptococcus mutans | 333 |
+| Klebsiella aerogenes | 330 |
+| Stenotrophomonas maltophilia | 263 |
+
+**Follow-ups:**
+
+- Threshold coverage is 46.6% -- 496 species still have no breakpoint filled in. See punch list for the highest-impact organisms to prioritize.
 

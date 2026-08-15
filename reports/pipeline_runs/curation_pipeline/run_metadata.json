@@ -1,0 +1,25 @@
+{
+  "paths": {
+    "cache_dir": "/Users/lukajin/PycharmProjects/soamp/.cache",
+    "data_dir": "/Users/lukajin/PycharmProjects/soamp/data",
+    "reports_dir": "/Users/lukajin/PycharmProjects/soamp/reports",
+    "tracking_dir": "/Users/lukajin/PycharmProjects/soamp/reports/pipeline_runs"
+  },
+  "crawl": {
+    "max_workers": 20,
+    "max_id": 24207,
+    "id_margin": 500,
+    "request_timeout_s": 20
+  },
+  "split": {
+    "identity_threshold": 0.6,
+    "test_size": 0.2,
+    "random_seed": 42,
+    "post_filtering": true
+  },
+  "tracking": {
+    "exp_id": "curation_pipeline",
+    "backend": "local",
+    "wandb_project": "soamp"
+  }
+}

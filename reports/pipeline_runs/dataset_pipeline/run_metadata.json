@@ -1,0 +1,26 @@
+{
+  "paths": {
+    "data_dir": "/Users/lukajin/PycharmProjects/soamp/data",
+    "reports_dir": "/Users/lukajin/PycharmProjects/soamp/reports",
+    "tracking_dir": "/Users/lukajin/PycharmProjects/soamp/reports/pipeline_runs"
+  },
+  "input_files": {
+    "regression_dataset_filename": "final_mic_regression_dataset.csv",
+    "activity_labels_filename": "mic_activity_labels.csv",
+    "split_indices_filename": "split_indices.json"
+  },
+  "output": {
+    "filename": "mic_classification_dataset.csv"
+  },
+  "label_filter": {
+    "included_labels": [
+      "active",
+      "inactive"
+    ]
+  },
+  "tracking": {
+    "exp_id": "dataset_pipeline",
+    "backend": "local",
+    "wandb_project": "soamp"
+  }
+}

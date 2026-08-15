@@ -1,0 +1,22 @@
+{
+  "name": "dataset_validated",
+  "type": "dataset",
+  "metadata": {
+    "n_rows": 72587,
+    "n_unique_peptides": 15904,
+    "n_qmap": 62331,
+    "n_recovered": 10256
+  },
+  "depends_on": [
+    "dataset_curated",
+    "dataset_recovered"
+  ],
+  "files": [
+    {
+      "path": "/Users/lukajin/PycharmProjects/soamp/data/final_mic_regression_dataset.csv",
+      "sha256": "16087e2ccadc6b810cea59ec003b1901d0d31e51c8d2ee9d957c6be71fc88016",
+      "bytes": 32752425
+    }
+  ],
+  "logged_at": 1786814698.202671
+}

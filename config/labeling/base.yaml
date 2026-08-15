@@ -1,0 +1,14 @@
+paths:
+  cache_dir: .cache
+  data_dir: data
+  reports_dir: reports
+  thresholds_dir: config/thresholds
+  tracking_dir: reports/pipeline_runs
+
+threshold_table:
+  filename: organism_thresholds.csv
+
+tracking:
+  exp_id: labeling_pipeline
+  backend: local
+  wandb_project: soamp

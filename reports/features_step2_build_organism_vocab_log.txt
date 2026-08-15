@@ -1,0 +1,4 @@
+=== Features step 2: organism vocab ===
+Organisms: ['Escherichia coli', 'Pseudomonas aeruginosa', 'Staphylococcus aureus']
+Vocab size (incl. reserved unknown_index=0): 4
+Wrote /Users/lukajin/PycharmProjects/soamp/data/organism_vocab.json

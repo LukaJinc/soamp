@@ -23,6 +23,7 @@ SECTION_MODULES = [
     "section4_filter_verification",
     "section5_split_integrity",
     "section6_sanity_checks",
+    "section7_threshold_coverage",
 ]
 
 OUT_PATH = os.path.join(REPORTS, "qa_report.md")

@@ -61,11 +61,25 @@ class QAContext:
     final: pd.DataFrame
     split: dict
     audit_text: str
+    # Labeling stage outputs -- optional (None) because that stage is separate
+    # from the curation pipeline and may not have been run yet.
+    threshold_table: Optional[pd.DataFrame] = None
+    censor_direction: Optional[pd.DataFrame] = None
+    labels: Optional[pd.DataFrame] = None
     results: dict = field(default_factory=dict)   # populated as sections run
 
 
 def _read_csv(path, **kw):
     return pd.read_csv(path, dtype={"peptide_id": str}, keep_default_na=True, **kw)
+
+
+def _read_csv_optional(path, **kw):
+    """Like _read_csv, but returns None instead of raising if the file
+    doesn't exist yet -- used for labeling-stage artifacts, which are
+    produced by a separate, optional pipeline stage."""
+    if not os.path.exists(path):
+        return None
+    return _read_csv(path, **kw)
 
 
 def load_context() -> QAContext:
@@ -98,11 +112,17 @@ def load_context() -> QAContext:
     with open(os.path.join(REPORTS, "curation_audit.md")) as f:
         audit_text = f.read()
 
+    threshold_table = _read_csv_optional(
+        os.path.join(BASE, "config", "thresholds", "organism_thresholds.csv"))
+    censor_direction = _read_csv_optional(os.path.join(DATA, "mic_censor_direction.csv"))
+    labels = _read_csv_optional(os.path.join(DATA, "mic_activity_labels.csv"))
+
     return QAContext(
         raw_by_id=raw_by_id, qmap_raw=qmap_raw, qmap_included=qmap_included,
         dbaasp_raw_full=dbaasp_raw_full, diff=diff, recovered=recovered,
         unconvertible=unconvertible, step5=step5, final=final, split=split,
-        audit_text=audit_text,
+        audit_text=audit_text, threshold_table=threshold_table,
+        censor_direction=censor_direction, labels=labels,
     )
 
 

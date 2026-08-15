@@ -9,16 +9,35 @@ detected (with counts), and intrachain bond types other than disulfide/amide
 No filtering happens here -- every peptide entry successfully fetched is retained
 and flagged, per the task's "keep everything, flag it instead" instruction.
 """
+import argparse
 import os
 import json
 import csv
 from collections import Counter
 
-from soamp.curation.parse_dbaasp import DBAASPPeptide
+from dotenv import load_dotenv
 
-RAW_JSONL = os.path.join(os.path.dirname(__file__), "..", "..", ".cache", "dbaasp_raw.jsonl")
-OUT_CSV = os.path.join(os.path.dirname(__file__), "..", "..", "data", "dbaasp_raw_full.csv")
-LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "reports", "step2_dbaasp_raw_pull_log.txt")
+from soamp.common.tracking import build_tracker
+from soamp.curation.config import CurationConfig
+from soamp.curation.parse_dbaasp import DBAASPPeptide
+from soamp.utils.config import load_config
+
+
+load_dotenv()
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", default="config/curation/base.yaml")
+    return parser.parse_args()
+
+
+ARGS = _parse_args()
+CFG = load_config(ARGS.config, CurationConfig)
+RAW_JSONL = CFG.paths.cache_dir / "dbaasp_raw.jsonl"
+OUT_CSV = CFG.paths.data_dir / "dbaasp_raw_full.csv"
+LOG_PATH = CFG.paths.reports_dir / "step2_dbaasp_raw_pull_log.txt"
+TRACKER = build_tracker(CFG.tracking, CFG.paths.tracking_dir)
 
 FIELDNAMES = [
     "peptide_id", "dbaasp_id", "sequence", "sequence_length",
@@ -32,6 +51,8 @@ FIELDNAMES = [
 
 
 def main():
+    TRACKER.log_config(CFG.model_dump(mode="json"))
+
     rows = []
     n_total = 0
     n_with_smiles = 0
@@ -136,6 +157,7 @@ def main():
         f.write("\n".join(log_lines) + "\n")
 
     print("\n".join(log_lines))
+    TRACKER.close()
 
 
 if __name__ == "__main__":

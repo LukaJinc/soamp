@@ -1,0 +1,29 @@
+{
+  "name": "baseline_mlp_v1_model",
+  "type": "model",
+  "metadata": {
+    "best_epoch": 30,
+    "best_val_auroc": 0.8095846270718937,
+    "git_sha": "a712ba1d0183f2137d1c3d547d73026c744bcb95",
+    "seed": 42,
+    "test_metrics": {
+      "accuracy": 0.7408725451430078,
+      "f1": 0.8217588395285584,
+      "auroc": 0.8373979408042519
+    }
+  },
+  "depends_on": [
+    "dataset_model_ready",
+    "features_peptide",
+    "features_organism",
+    "features_peptide_scaler"
+  ],
+  "files": [
+    {
+      "path": "/Users/lukajin/PycharmProjects/soamp/reports/checkpoints/baseline_mlp_v1_best.pth",
+      "sha256": "15da76d0cfc1c989ad67dab16dda9b99c0dc5c9169d66ba244d977fb41cdbf3d",
+      "bytes": 9978
+    }
+  ],
+  "logged_at": 1786815054.5123022
+}

@@ -1,0 +1,30 @@
+{
+  "name": "labels_threshold_derived",
+  "type": "labels",
+  "metadata": {
+    "n_total": 72587,
+    "match_level_counts": {
+      "species": 33840,
+      "none": 38747
+    },
+    "label_counts": {
+      "uncertain": 9210,
+      "unlabeled": 38747,
+      "active": 20736,
+      "inactive": 3894
+    },
+    "coverage_pct": 46.61991816716492
+  },
+  "depends_on": [
+    "dataset_validated",
+    "thresholds_organism_specific"
+  ],
+  "files": [
+    {
+      "path": "/Users/lukajin/PycharmProjects/soamp/data/mic_activity_labels.csv",
+      "sha256": "cebeda5685346e78935902669a2a9fb3915dcf7430bf0c067dd745cb84fbdfca",
+      "bytes": 6630803
+    }
+  ],
+  "logged_at": 1786814855.8364742
+}
