@@ -22,18 +22,6 @@ def test_extra_nested_key_rejected():
         LabelingConfig.model_validate({"paths": {"bogus_key": "x"}})
 
 
-def test_tracking_defaults():
-    cfg = load_config("config/labeling/base.yaml", LabelingConfig)
-    assert cfg.tracking.exp_id == "labeling_pipeline"
-    assert cfg.tracking.backend == "local"
-    assert cfg.paths.tracking_dir.is_absolute()
-
-
-def test_tracking_extra_key_rejected():
-    with pytest.raises(ValidationError):
-        LabelingConfig.model_validate({"tracking": {"bogus_key": "x"}})
-
-
 def test_base_override_composition(tmp_path):
     base = tmp_path / "base.yaml"
     base.write_text(

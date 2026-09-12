@@ -33,7 +33,6 @@ from collections import Counter
 
 from dotenv import load_dotenv
 
-from soamp.common.tracking import build_tracker
 from soamp.curation.config import CurationConfig
 from soamp.utils.config import load_config
 
@@ -52,7 +51,6 @@ CFG = load_config(ARGS.config, CurationConfig)
 HF_JSON = CFG.paths.cache_dir / "qmap_hf" / "dbaasp.json"
 OUT_CSV = CFG.paths.data_dir / "qmap_included.csv"
 LOG_PATH = CFG.paths.reports_dir / "step1_qmap_pull_log.txt"
-TRACKER = build_tracker(CFG.tracking, CFG.paths.tracking_dir)
 
 CANONICAL_L = set("ACDEFGHIKLMNPQRSTVWY")
 
@@ -87,8 +85,6 @@ def noncanonical_kind(sequence: str) -> str:
 
 
 def main():
-    TRACKER.log_config(CFG.model_dump(mode="json"))
-
     with open(HF_JSON) as f:
         data = json.load(f)
 
@@ -148,13 +144,6 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
 
-    TRACKER.log_artifact(
-        name="raw_qmap", artifact_type="raw",
-        paths=[OUT_CSV],
-        metadata={"n_peptides": len(data), "n_rows": n_target_rows_total,
-                  "n_unique_organisms": len(organisms)},
-    )
-
     n_peptides = len(data)
     n_peptides_with_any_target = sum(1 for e in data if e.get("targets"))
     n_peptides_no_target = n_peptides - n_peptides_with_any_target
@@ -206,7 +195,6 @@ def main():
         f.write("\n".join(log_lines) + "\n")
 
     print("\n".join(log_lines))
-    TRACKER.close()
 
 
 if __name__ == "__main__":

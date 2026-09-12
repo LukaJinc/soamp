@@ -25,7 +25,6 @@ from collections import Counter
 from soamp.common.thresholds import load_threshold_table, lookup_threshold
 from dotenv import load_dotenv
 
-from soamp.common.tracking import build_tracker
 from soamp.labeling.config import LabelingConfig
 from soamp.labeling.labels import derive_label
 from soamp.utils.config import load_config
@@ -48,7 +47,6 @@ CENSOR_CSV = CFG.paths.data_dir / "mic_censor_direction.csv"
 TABLE_CSV = CFG.paths.thresholds_dir / CFG.threshold_table.filename
 OUT_CSV = CFG.paths.data_dir / "mic_activity_labels.csv"
 LOG_PATH = CFG.paths.reports_dir / "labeling_step2_binarize_log.txt"
-TRACKER = build_tracker(CFG.tracking, CFG.paths.tracking_dir)
 
 FIELDNAMES = ["peptide_id", "organism", "mic_value_uM", "mic_type",
               "active_threshold_uM", "inactive_threshold_uM",
@@ -57,7 +55,6 @@ FIELDNAMES = ["peptide_id", "organism", "mic_value_uM", "mic_type",
 
 def main() -> None:
     log = configure_logging("labeling.02_binarize_mic_labels")
-    TRACKER.log_config(CFG.model_dump(mode="json"))
 
     with open(FINAL_CSV, newline="") as f:
         rows = list(csv.DictReader(f))
@@ -71,12 +68,6 @@ def main() -> None:
     table = load_threshold_table(TABLE_CSV)
     log.info(f"Loaded threshold table: {len(table.species)} species thresholds, "
               f"{len(table.genus)} genus thresholds filled in")
-
-    thresholds_artifact = TRACKER.log_artifact(
-        name="thresholds_organism_specific", artifact_type="config",
-        paths=[TABLE_CSV],
-        metadata={"n_species_thresholds": len(table.species), "n_genus_thresholds": len(table.genus)},
-    )
 
     out_rows = []
     label_counts: Counter[str] = Counter()
@@ -126,14 +117,6 @@ def main() -> None:
     n_covered = n_total - match_level_counts["none"]
     coverage_pct = 100 * n_covered / n_total if n_total else 0.0
 
-    TRACKER.log_artifact(
-        name="labels_threshold_derived", artifact_type="labels",
-        paths=[OUT_CSV],
-        metadata={"n_total": n_total, "match_level_counts": dict(match_level_counts),
-                  "label_counts": dict(label_counts), "coverage_pct": coverage_pct},
-        depends_on=["dataset_validated", thresholds_artifact],
-    )
-
     CFG.paths.reports_dir.mkdir(parents=True, exist_ok=True)
     log_lines = [
         "=== Labeling step 2: MIC binarization ===",
@@ -146,7 +129,6 @@ def main() -> None:
     with open(LOG_PATH, "w") as f:
         f.write("\n".join(log_lines) + "\n")
     log.info("\n".join(log_lines))
-    TRACKER.close()
 
 
 if __name__ == "__main__":

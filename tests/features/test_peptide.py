@@ -5,6 +5,7 @@ from soamp.features.peptide import (
     PeptideFeatureError,
     build_peptide_feature_rows,
     compute_peptide_descriptors,
+    index_feature_rows_by_peptide_id,
     select_unique_peptides,
 )
 
@@ -74,3 +75,18 @@ def test_build_peptide_feature_rows_raises_on_unparseable_smiles():
     unique_peptides = [{"peptide_id": "1", "smiles": "not a smiles!!!"}]
     with pytest.raises(PeptideFeatureError):
         build_peptide_feature_rows(unique_peptides)
+
+
+def test_index_feature_rows_by_peptide_id_reshapes_and_casts_to_float():
+    feature_rows = [
+        {"peptide_id": "1", "a": "1.5", "b": "2.5"},
+        {"peptide_id": "2", "a": "3.0", "b": "4.0"},
+    ]
+    result = index_feature_rows_by_peptide_id(feature_rows, descriptor_names=["a", "b"])
+    assert result == {"1": {"a": 1.5, "b": 2.5}, "2": {"a": 3.0, "b": 4.0}}
+
+
+def test_index_feature_rows_by_peptide_id_raises_on_missing_descriptor():
+    feature_rows = [{"peptide_id": "1", "a": "1.0"}]
+    with pytest.raises(PeptideFeatureError):
+        index_feature_rows_by_peptide_id(feature_rows, descriptor_names=["a", "b"])

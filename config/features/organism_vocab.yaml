@@ -1,0 +1,9 @@
+# Organism side of the featurization grid: a learned embedding lookup
+# (output_kind="index"). Used by pipeline/features/02_build_organism_vocab.py.
+_base_: base.yaml
+
+organism_featurization:
+  method: vocab_embedding
+
+output_files:
+  organism_vocab_filename: organism_vocab_vocab_embedding.json

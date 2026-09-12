@@ -25,13 +25,13 @@ class Trainer:
         """One grad-updating pass. Returns {'loss': mean_train_loss}."""
         self.model.train()
         total_loss, n_batches = 0.0, 0
-        for peptide_features, organism_idx, labels in loader:
+        for peptide_features, organism_input, labels in loader:
             peptide_features = peptide_features.to(self.device)
-            organism_idx = organism_idx.to(self.device)
+            organism_input = organism_input.to(self.device)
             labels = labels.to(self.device)
 
             self.optimizer.zero_grad()
-            logits = self.model(peptide_features, organism_idx)
+            logits = self.model(peptide_features, organism_input)
             loss = self.loss_fn(logits, labels)
             loss.backward()
             self.optimizer.step()
@@ -42,30 +42,33 @@ class Trainer:
 
     @torch.no_grad()
     def evaluate(self, loader: DataLoader) -> dict[str, "np.ndarray | float"]:
-        """No-grad forward pass. Returns raw logits/labels/organism_idx
-        (flat numpy arrays) plus mean loss. Metric *interpretation*
+        """No-grad forward pass. Returns raw logits/labels/organism_input
+        plus mean loss. organism_input is whatever the featurizer encodes --
+        an (N,) index vector for output_kind="index", an (N, D) float matrix
+        for "vector" -- so per-organism bucketing works off the eval rows'
+        organism column instead (see engine/metrics.py). Metric *interpretation*
         (accuracy/F1/AUROC/per-organism) is orchestration's job
         (engine/metrics.py), kept out of Trainer per sec 6."""
         self.model.eval()
-        all_logits, all_labels, all_organism_idx = [], [], []
+        all_logits, all_labels, all_organism_inputs = [], [], []
         total_loss, n_batches = 0.0, 0
-        for peptide_features, organism_idx, labels in loader:
+        for peptide_features, organism_input, labels in loader:
             peptide_features = peptide_features.to(self.device)
-            organism_idx = organism_idx.to(self.device)
+            organism_input = organism_input.to(self.device)
             labels = labels.to(self.device)
 
-            logits = self.model(peptide_features, organism_idx)
+            logits = self.model(peptide_features, organism_input)
             loss = self.loss_fn(logits, labels)
 
             all_logits.append(logits.cpu().numpy())
             all_labels.append(labels.cpu().numpy())
-            all_organism_idx.append(organism_idx.cpu().numpy())
+            all_organism_inputs.append(organism_input.cpu().numpy())
             total_loss += loss.item()
             n_batches += 1
 
         return {
             "logits": np.concatenate(all_logits),
             "labels": np.concatenate(all_labels),
-            "organism_idx": np.concatenate(all_organism_idx),
+            "organism_input": np.concatenate(all_organism_inputs),
             "loss": total_loss / n_batches,
         }

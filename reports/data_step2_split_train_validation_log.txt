@@ -1,0 +1,6 @@
+=== Data step 2: train/validation split ===
+val_fraction=0.3 seed=42 identity_threshold=0.6 post_filtering=True
+fit peptide_ids: 5743  val peptide_ids: 2840
+fit rows: 11308  val rows: 5735  test rows: 7587
+has_noncanonical fraction -- fit: 0.213  val: 0.174  test: 0.217
+Wrote /Users/lukajin/PycharmProjects/soamp/data/val_split.json

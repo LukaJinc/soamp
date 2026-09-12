@@ -1,36 +1,50 @@
 paths:
   data_dir: data
   reports_dir: reports
-  tracking_dir: reports/pipeline_runs
 
 input_files:
   classification_dataset_filename: mic_classification_dataset.csv
 
-descriptors:
-  names:
-    - MolWt
-    - TPSA
-    - MolLogP
-    - NumHDonors
-    - NumHAcceptors
-    - NumRotatableBonds
-    - FractionCSP3
-    - RingCount
-    - NumAromaticRings
-    - HeavyAtomCount
-    - NumHeteroatoms
-    - LabuteASA
-    - FormalCharge
+peptide_featurization:
+  method: rdkit_descriptors
+  rdkit_descriptors:
+    descriptor_names:
+      - MolWt
+      - TPSA
+      - MolLogP
+      - NumHDonors
+      - NumHAcceptors
+      - NumRotatableBonds
+      - FractionCSP3
+      - RingCount
+      - NumAromaticRings
+      - HeavyAtomCount
+      - NumHeteroatoms
+      - LabuteASA
+      - FormalCharge
+  peptideclm_embedding:
+    checkpoint: aaronfeller/PeptideCLM-23M-all
+    batch_size: 16
+    max_length: 512
+    # "auto" -> CUDA when available. This is the one step that genuinely
+    # wants a GPU; raise batch_size alongside it on a real accelerator.
+    device: auto
 
-organism_vocab:
-  unknown_index: 0
+organism_featurization:
+  method: vocab_embedding
+  vocab_embedding:
+    unknown_index: 0
+  kmer_composition:
+    k_values: [1, 2, 3, 4]
+    accessions_csv_path: config/organism_genomes/organism_genome_accessions.csv
+    genome_cache_dir: .cache/refseq_genomes
 
+# Method-suffixed, matching the methods selected above -- so every artifact on
+# disk names the featurization that produced it and the grid's four cells never
+# overwrite one another. The per-cell overlays (peptide_rdkit.yaml,
+# peptide_peptideclm.yaml, organism_vocab.yaml, organism_kmer.yaml) restate
+# these explicitly; this file's values are the defaults they build on.
 output_files:
-  peptide_features_filename: peptide_features.csv
-  organism_vocab_filename: organism_vocab.json
-  peptide_feature_scaler_filename: peptide_feature_scaler.json
-
-tracking:
-  exp_id: features_pipeline
-  backend: local
-  wandb_project: soamp
+  peptide_features_filename: peptide_features_rdkit.csv
+  organism_vocab_filename: organism_vocab_vocab_embedding.json
+  peptide_feature_scaler_filename: peptide_feature_scaler_rdkit.json

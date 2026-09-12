@@ -12,7 +12,6 @@ from datetime import date
 
 from dotenv import load_dotenv
 
-from soamp.common.tracking import build_tracker
 from soamp.curation.config import CurationConfig
 from soamp.utils.config import load_config
 
@@ -31,7 +30,6 @@ CFG = load_config(ARGS.config, CurationConfig)
 REPORTS = CFG.paths.reports_dir
 DATA = CFG.paths.data_dir
 OUT_MD = REPORTS / "curation_audit.md"
-TRACKER = build_tracker(CFG.tracking, CFG.paths.tracking_dir)
 
 
 def read_log(name):
@@ -43,8 +41,6 @@ def read_log(name):
 
 
 def main():
-    TRACKER.log_config(CFG.model_dump(mode="json"))
-
     final_rows = []
     final_csv_path = os.path.join(DATA, "final_mic_regression_dataset.csv")
     if os.path.exists(final_csv_path):
@@ -286,15 +282,6 @@ def main():
     with open(OUT_MD, "w") as f:
         f.write("\n".join(md) + "\n")
     print(f"Wrote {OUT_MD}")
-
-    TRACKER.log_artifact(
-        name="curation_audit_report", artifact_type="report",
-        paths=[OUT_MD],
-        metadata={"n_final_rows": len(final_rows), "n_unique_peptides": unique_peptides,
-                  "source_counts": dict(source_counter)},
-        depends_on=["dataset_validated", "splits_v1"],
-    )
-    TRACKER.close()
 
 
 if __name__ == "__main__":

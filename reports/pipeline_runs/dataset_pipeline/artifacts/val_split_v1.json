@@ -1,0 +1,27 @@
+{
+  "name": "val_split_v1",
+  "type": "split",
+  "metadata": {
+    "val_fraction": 0.3,
+    "seed": 42,
+    "identity_threshold": 0.6,
+    "n_fit": 5743,
+    "n_val": 2840,
+    "has_noncanonical_fraction": {
+      "fit": 0.2130350194552529,
+      "val": 0.17367044463818657,
+      "test": 0.21721365493607486
+    }
+  },
+  "depends_on": [
+    "dataset_model_ready"
+  ],
+  "files": [
+    {
+      "path": "/Users/lukajin/PycharmProjects/soamp/data/val_split.json",
+      "sha256": "541b6bd85b7fd7e34747df2a4c8a1f956fa90b4463ee4d2cd3e65774e57f874a",
+      "bytes": 107959
+    }
+  ],
+  "logged_at": 1788437890.546171
+}

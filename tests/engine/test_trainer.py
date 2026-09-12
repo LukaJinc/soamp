@@ -7,9 +7,9 @@ from soamp.model.baseline_mlp import BaselineClassifier
 
 def _loader(n=16):
     peptide_features = torch.randn(n, 13)
-    organism_idx = torch.randint(0, 4, (n,))
+    organism_input = torch.randint(0, 4, (n,))
     labels = torch.randint(0, 2, (n,)).float()
-    dataset = TensorDataset(peptide_features, organism_idx, labels)
+    dataset = TensorDataset(peptide_features, organism_input, labels)
     return DataLoader(dataset, batch_size=4)
 
 
@@ -40,7 +40,7 @@ def test_evaluate_returns_arrays_matching_dataset_size():
     out = trainer.evaluate(_loader(n=16))
     assert out["logits"].shape == (16,)
     assert out["labels"].shape == (16,)
-    assert out["organism_idx"].shape == (16,)
+    assert out["organism_input"].shape == (16,)
 
 
 def test_evaluate_is_no_grad():

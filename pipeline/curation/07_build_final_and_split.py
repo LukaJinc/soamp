@@ -35,7 +35,6 @@ import json
 
 from dotenv import load_dotenv
 
-from soamp.common.tracking import build_tracker
 from soamp.curation.config import CurationConfig
 from soamp.utils.config import load_config
 
@@ -55,7 +54,6 @@ STEP5_CSV = CFG.paths.data_dir / "step5_standardized_mic.csv"
 FINAL_CSV = CFG.paths.data_dir / "final_mic_regression_dataset.csv"
 SPLIT_JSON = CFG.paths.data_dir / "split_indices.json"
 LOG_PATH = CFG.paths.reports_dir / "step6_final_split_log.txt"
-TRACKER = build_tracker(CFG.tracking, CFG.paths.tracking_dir)
 
 FINAL_FIELDNAMES = [
     "peptide_id", "sequence", "smiles", "organism", "ncbi_taxon_id_if_available",
@@ -78,8 +76,6 @@ POST_FILTERING_NOTE = (
 
 
 def main():
-    TRACKER.log_config(CFG.model_dump(mode="json"))
-
     with open(STEP5_CSV) as f:
         rows = list(csv.DictReader(f))
 
@@ -127,14 +123,6 @@ def main():
     log_lines.append(f"  unique peptides source=qmap_original: {uniq_qmap}")
     log_lines.append(f"  unique peptides source=recovered: {uniq_recovered}")
 
-    dataset_validated_artifact = TRACKER.log_artifact(
-        name="dataset_validated", artifact_type="dataset",
-        paths=[FINAL_CSV],
-        metadata={"n_rows": len(final_rows), "n_unique_peptides": len(peptide_ids),
-                  "n_qmap": n_qmap, "n_recovered": n_recovered},
-        depends_on=["dataset_curated", "dataset_recovered"],
-    )
-
     dropped_ids = []
     try:
         from qmap.toolkit import train_test_split
@@ -181,15 +169,6 @@ def main():
     with open(SPLIT_JSON, "w") as f:
         json.dump(split_indices, f, indent=2)
 
-    TRACKER.log_artifact(
-        name="splits_v1", artifact_type="split",
-        paths=[SPLIT_JSON],
-        metadata={"identity_threshold": IDENTITY_THRESHOLD, "test_size": TEST_SIZE,
-                  "n_train": len(train_ids), "n_test": len(test_ids),
-                  "n_reassigned_leakage_filter": len(dropped_ids)},
-        depends_on=[dataset_validated_artifact],
-    )
-
     if split_ok:
         n_train_rows = sum(1 for r in final_rows if r["peptide_id"] in train_id_set)
         n_test_rows = sum(1 for r in final_rows if r["peptide_id"] in test_id_set)
@@ -218,7 +197,6 @@ def main():
     with open(LOG_PATH, "w") as f:
         f.write("\n".join(log_lines) + "\n")
     print("\n".join(log_lines))
-    TRACKER.close()
 
 
 if __name__ == "__main__":

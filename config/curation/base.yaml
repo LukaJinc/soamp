@@ -2,7 +2,6 @@ paths:
   cache_dir: .cache
   data_dir: data
   reports_dir: reports
-  tracking_dir: reports/pipeline_runs
 
 crawl:
   max_workers: 20
@@ -15,8 +14,3 @@ split:
   test_size: 0.2
   random_seed: 42
   post_filtering: true
-
-tracking:
-  exp_id: curation_pipeline
-  backend: local
-  wandb_project: soamp

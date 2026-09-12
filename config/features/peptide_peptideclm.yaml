@@ -1,0 +1,18 @@
+# Peptide side of the featurization grid: frozen PeptideCLM-23M embeddings
+# (768 dims, mean-pooled). Used by pipeline/features/01_build_peptide_features.py
+# and 03_fit_peptide_scaler.py.
+#
+# This is the one genuinely GPU-bound stage -- `device: auto` picks CUDA when
+# available, and batch_size is raised from base.yaml's conservative 16 since a
+# real accelerator has the memory for it.
+_base_: base.yaml
+
+peptide_featurization:
+  method: peptideclm_embedding
+  peptideclm_embedding:
+    batch_size: 64
+    device: auto
+
+output_files:
+  peptide_features_filename: peptide_features_peptideclm.csv
+  peptide_feature_scaler_filename: peptide_feature_scaler_peptideclm.json

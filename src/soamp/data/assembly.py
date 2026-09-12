@@ -10,7 +10,7 @@ from typing import Iterable
 FIELDNAMES = [
     "peptide_id", "sequence", "smiles", "organism",
     "ncbi_taxon_id_if_available", "mic_value_uM", "mic_type",
-    "label", "split",
+    "has_noncanonical", "label", "split",
 ]
 
 
@@ -34,8 +34,8 @@ def join_regression_and_labels(
 ) -> list[dict]:
     """Join filtered_label_rows against regression_rows on
     (peptide_id, organism) -- unique in both files. Pulls sequence/smiles/
-    ncbi_taxon_id_if_available/mic_value_uM/mic_type from the regression
-    row, label from the label row.
+    ncbi_taxon_id_if_available/mic_value_uM/mic_type/has_noncanonical from
+    the regression row, label from the label row.
 
     Raises DatasetAssemblyError if a filtered label row's key has no
     match in regression_rows -- the two files are expected to mirror
@@ -60,6 +60,7 @@ def join_regression_and_labels(
             "ncbi_taxon_id_if_available": reg_row["ncbi_taxon_id_if_available"],
             "mic_value_uM": reg_row["mic_value_uM"],
             "mic_type": reg_row["mic_type"],
+            "has_noncanonical": reg_row["has_noncanonical"],
             "label": label_row["label"],
         })
     return out

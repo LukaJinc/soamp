@@ -27,7 +27,6 @@ from collections import Counter
 
 from dotenv import load_dotenv
 
-from soamp.common.tracking import build_tracker
 from soamp.curation.config import CurationConfig
 from soamp.curation.parse_dbaasp import DBAASPPeptide
 from soamp.curation.smiles_gen import generate_smiles
@@ -50,7 +49,6 @@ DIFF_CSV = CFG.paths.data_dir / "dbaasp_vs_qmap_diff.csv"
 OUT_CSV = CFG.paths.data_dir / "recovered_peptides.csv"
 LOG_PATH = CFG.paths.reports_dir / "step4_recovery_log.txt"
 UNCONVERTIBLE_CSV = CFG.paths.data_dir / "unconvertible_peptides.csv"
-TRACKER = build_tracker(CFG.tracking, CFG.paths.tracking_dir)
 
 BUCKET_TO_CATEGORY = {
     "b2_excluded_unsupported_terminus": "terminus_based",
@@ -61,8 +59,6 @@ BUCKET_TO_CATEGORY = {
 
 
 def main():
-    TRACKER.log_config(CFG.model_dump(mode="json"))
-
     raw_peptides = {}
     with open(RAW_JSONL) as f:
         for line in f:
@@ -149,14 +145,6 @@ def main():
         writer.writeheader()
         writer.writerows(unconvertible)
 
-    TRACKER.log_artifact(
-        name="dataset_recovered", artifact_type="dataset",
-        paths=[OUT_CSV, UNCONVERTIBLE_CSV],
-        metadata={"n_recovered": len(recovered), "n_unconvertible": len(unconvertible),
-                  "recovered_via": dict(recovered_via_counter)},
-        depends_on=["dataset_curated"],
-    )
-
     log_lines = []
     log_lines.append("=== Step 4: recovery of non-canonical/cyclic peptides excluded from QMAP ===")
     log_lines.append(f"Total candidate entries considered (buckets b1-b5): {sum(by_bucket_total.values())}")
@@ -183,7 +171,6 @@ def main():
     with open(LOG_PATH, "w") as f:
         f.write("\n".join(log_lines) + "\n")
     print("\n".join(log_lines))
-    TRACKER.close()
 
 
 if __name__ == "__main__":

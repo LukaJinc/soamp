@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 
 CLAUDE.md
+notes.txt
 
 # C extensions
 *.so
@@ -221,3 +222,18 @@ __marimo__/
 
 # wandb local run cache
 wandb/
+
+# PeptideCLM peptide features: 12,371 x 768 floats, ~190MB as CSV -- past
+# GitHub's 100MB per-file limit and regenerable in minutes on a GPU via
+# `pipeline/features/01_build_peptide_features.py --config
+# config/features/peptide_peptideclm.yaml`. The RDKit descriptor artifact
+# (1.4MB) IS committed; this one is built per-environment and cached to Drive.
+data/peptide_features_peptideclm.csv
+
+# EDA intermediates: 39MB of clustering embeddings/distance matrices, all
+# regenerable from scripts/EDA/01-05 and not an input to any pipeline stage.
+data/clustering/
+
+# wandb artifact download cache (scripts/EDA/*.ipynb re-fetch these from the
+# run they were logged to; nothing reads them as a pipeline input).
+scripts/EDA/artifacts/

@@ -1,0 +1,15 @@
+# Organism side of the featurization grid: RefSeq genome k-mer composition
+# (output_kind="vector", 340 dims). Used by
+# pipeline/features/02_build_organism_vocab.py.
+#
+# Needs the genome FASTAs in .cache/refseq_genomes -- run
+# pipeline/features/00_fetch_organism_genomes.py first. The resulting artifact
+# bakes the k-mer vectors in, so downstream training needs neither the FASTAs
+# nor network access.
+_base_: base.yaml
+
+organism_featurization:
+  method: kmer_composition
+
+output_files:
+  organism_vocab_filename: organism_vocab_kmer_composition.json

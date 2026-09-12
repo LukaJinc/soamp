@@ -14,7 +14,6 @@ import argparse
 
 from dotenv import load_dotenv
 
-from soamp.common.tracking import build_tracker
 from soamp.curation.config import CurationConfig
 from soamp.curation.dbaasp_client import crawl_all
 from soamp.utils.config import load_config
@@ -35,9 +34,6 @@ def main() -> None:
     out_jsonl = CFG.paths.cache_dir / "dbaasp_raw.jsonl"
     log_path = CFG.paths.cache_dir / "dbaasp_crawl_log.txt"
 
-    tracker = build_tracker(CFG.tracking, CFG.paths.tracking_dir)
-    tracker.log_config(CFG.model_dump(mode="json"))
-
     n_ok, n_not_found, n_error = crawl_all(
         out_jsonl, log_path,
         max_workers=CFG.crawl.max_workers,
@@ -45,16 +41,7 @@ def main() -> None:
         probe_margin=CFG.crawl.id_margin,
         resume=True,
     )
-
-    tracker.log_artifact(
-        name="raw_dbaasp", artifact_type="raw",
-        paths=[out_jsonl],
-        metadata={
-            "n_ok": n_ok, "n_not_found": n_not_found, "n_error": n_error,
-            "max_id": CFG.crawl.max_id, "id_margin": CFG.crawl.id_margin,
-        },
-    )
-    tracker.close()
+    print(f"crawl done: n_ok={n_ok} n_not_found={n_not_found} n_error={n_error}")
 
 
 if __name__ == "__main__":

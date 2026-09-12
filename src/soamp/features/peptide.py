@@ -98,3 +98,21 @@ def build_peptide_feature_rows(
             f"{len(failed)} peptide_id(s) had unparseable SMILES: {failed[:10]}"
         )
     return out
+
+
+def index_feature_rows_by_peptide_id(
+    feature_rows: list[dict], descriptor_names: list[str] = DESCRIPTOR_NAMES
+) -> dict[str, dict[str, float]]:
+    """Reshapes build_peptide_feature_rows-style rows (one dict per peptide,
+    string-valued when read back from a CSV) into {peptide_id: {descriptor:
+    float}} for PeptideOrganismDataset. Raises PeptideFeatureError if a row
+    is missing one of descriptor_names."""
+    out = {}
+    for row in feature_rows:
+        try:
+            out[row["peptide_id"]] = {name: float(row[name]) for name in descriptor_names}
+        except KeyError as e:
+            raise PeptideFeatureError(
+                f"peptide_id {row.get('peptide_id')!r} is missing descriptor {e}"
+            ) from e
+    return out

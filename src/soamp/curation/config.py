@@ -7,8 +7,6 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from soamp.common.tracking import TrackingConfig
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -18,9 +16,8 @@ class PathsConfig(BaseModel):
     cache_dir: Path = Path(".cache")
     data_dir: Path = Path("data")
     reports_dir: Path = Path("reports")
-    tracking_dir: Path = Path("reports/pipeline_runs")
 
-    @field_validator("cache_dir", "data_dir", "reports_dir", "tracking_dir", mode="after")
+    @field_validator("cache_dir", "data_dir", "reports_dir", mode="after")
     @classmethod
     def _resolve_relative_to_repo_root(cls, v: Path) -> Path:
         return v if v.is_absolute() else REPO_ROOT / v
@@ -50,4 +47,3 @@ class CurationConfig(BaseModel):
     paths: PathsConfig = PathsConfig()
     crawl: CrawlConfig = CrawlConfig()
     split: SplitConfig = SplitConfig()
-    tracking: TrackingConfig = TrackingConfig()

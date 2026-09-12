@@ -1,6 +1,0 @@
-_base_: base.yaml
-
-tracking:
-  exp_id: labeling_pipeline
-  backend: wandb
-  wandb_project: soamp

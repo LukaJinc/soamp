@@ -7,25 +7,36 @@
   "input_files": {
     "classification_dataset_filename": "mic_classification_dataset.csv"
   },
-  "descriptors": {
-    "names": [
-      "MolWt",
-      "TPSA",
-      "MolLogP",
-      "NumHDonors",
-      "NumHAcceptors",
-      "NumRotatableBonds",
-      "FractionCSP3",
-      "RingCount",
-      "NumAromaticRings",
-      "HeavyAtomCount",
-      "NumHeteroatoms",
-      "LabuteASA",
-      "FormalCharge"
-    ]
+  "peptide_featurization": {
+    "method": "rdkit_descriptors",
+    "rdkit_descriptors": {
+      "descriptor_names": [
+        "MolWt",
+        "TPSA",
+        "MolLogP",
+        "NumHDonors",
+        "NumHAcceptors",
+        "NumRotatableBonds",
+        "FractionCSP3",
+        "RingCount",
+        "NumAromaticRings",
+        "HeavyAtomCount",
+        "NumHeteroatoms",
+        "LabuteASA",
+        "FormalCharge"
+      ]
+    },
+    "peptideclm_embedding": {
+      "checkpoint": "aaronfeller/PeptideCLM-23M-all",
+      "batch_size": 16,
+      "max_length": 512
+    }
   },
-  "organism_vocab": {
-    "unknown_index": 0
+  "organism_featurization": {
+    "method": "vocab_embedding",
+    "vocab_embedding": {
+      "unknown_index": 0
+    }
   },
   "output_files": {
     "peptide_features_filename": "peptide_features.csv",

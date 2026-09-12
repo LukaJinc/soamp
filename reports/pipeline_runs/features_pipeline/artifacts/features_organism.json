@@ -2,6 +2,7 @@
   "name": "features_organism",
   "type": "features",
   "metadata": {
+    "method": "vocab_embedding",
     "vocab_size": 4,
     "unknown_index": 0
   },
@@ -11,9 +12,9 @@
   "files": [
     {
       "path": "/Users/lukajin/PycharmProjects/soamp/data/organism_vocab.json",
-      "sha256": "6db9645ccbe73d5665e59b051a1cee352d3b575b3f181f75bf21d4df1e9cef48",
-      "bytes": 153
+      "sha256": "096c214f11d832997469f8a72f42fbb0d9722b9320f6beb443c948e3e76fe2f2",
+      "bytes": 184
     }
   ],
-  "logged_at": 1786815028.978664
+  "logged_at": 1788630706.9423869
 }

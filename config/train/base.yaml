@@ -1,21 +1,30 @@
+exp_id: baseline_mlp_v1
+
 paths:
   data_dir: data
   reports_dir: reports
   checkpoint_dir: reports/checkpoints
-  tracking_dir: reports/train_runs
 
 input_files:
   classification_dataset_filename: mic_classification_dataset.csv
-  peptide_features_filename: peptide_features.csv
-  organism_vocab_filename: organism_vocab.json
-  peptide_feature_scaler_filename: peptide_feature_scaler.json
-
-split:
-  val_fraction: 0.1
+  # Defaults to the rdkit_descriptors x vocab_embedding artifacts, matching
+  # this file's baseline_classifier architecture (the original reference run).
+  # The exp_*.yaml overlays each point at their own cell's artifacts.
+  peptide_features_filename: peptide_features_rdkit.csv
+  organism_vocab_filename: organism_vocab_vocab_embedding.json
+  peptide_feature_scaler_filename: peptide_feature_scaler_rdkit.json
+  val_split_filename: val_split.json
 
 model:
-  organism_embed_dim: 8
-  hidden_dims: [32, 16]
+  architecture: baseline_classifier
+  baseline_classifier:
+    organism_embed_dim: 8
+    hidden_dims: [32, 16]
+  attention_fusion_classifier:
+    projection_dim: 128
+    num_attention_heads: 4
+    num_attention_layers: 1
+    hidden_dims: [64, 32]
 
 optim:
   learning_rate: 0.001
@@ -30,12 +39,17 @@ loop:
   batch_size: 256
   seed: 42
   num_dataloader_workers: 0
+  # "auto" -> CUDA when available, else CPU. Also accepts "cpu"/"cuda"/"cuda:0",
+  # which fail loud rather than silently falling back.
+  device: auto
 
 checkpoint:
   save_every_n_epochs: 5
+  # val_auroc | val_accuracy | val_f1 | val_loss -- selects which epoch's
+  # weights get saved as <exp_id>_best.pth and reloaded for the test eval.
   best_metric: val_auroc
 
-tracking:
-  exp_id: baseline_mlp_v1
-  backend: local
-  wandb_project: soamp
+# Forwarded to wandb.init. Set these in a per-experiment override so a grid of
+# related runs is grouped in the UI.
+wandb_group: null
+wandb_tags: []

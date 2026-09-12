@@ -10,13 +10,20 @@
     "split_indices_filename": "split_indices.json"
   },
   "output": {
-    "filename": "mic_classification_dataset.csv"
+    "filename": "mic_classification_dataset.csv",
+    "val_split_filename": "val_split.json"
   },
   "label_filter": {
     "included_labels": [
       "active",
       "inactive"
     ]
+  },
+  "val_split": {
+    "val_fraction": 0.3,
+    "seed": 42,
+    "identity_threshold": 0.6,
+    "post_filtering": true
   },
   "tracking": {
     "exp_id": "dataset_pipeline",

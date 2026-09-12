@@ -1,4 +1,4 @@
 === Features step 2: organism vocab ===
-Organisms: ['Escherichia coli', 'Pseudomonas aeruginosa', 'Staphylococcus aureus']
-Vocab size (incl. reserved unknown_index=0): 4
+Method: vocab_embedding
+Unique organisms in dataset: 3
 Wrote /Users/lukajin/PycharmProjects/soamp/data/organism_vocab.json

@@ -1,0 +1,6 @@
+=== Features step 0: fetch organism genomes ===
+Accessions requested: 3
+Fetched: 3 ['GCF_000005845.2', 'GCF_000006765.1', 'GCF_000013425.1']
+Already cached (skipped): 0 []
+Failed: 0 []
+Genome cache dir: /Users/lukajin/PycharmProjects/soamp/.cache/refseq_genomes

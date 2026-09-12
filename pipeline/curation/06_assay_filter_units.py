@@ -31,7 +31,6 @@ from collections import defaultdict, Counter
 
 from dotenv import load_dotenv
 
-from soamp.common.tracking import build_tracker
 from soamp.curation.config import CurationConfig
 from soamp.curation.parse_dbaasp import DBAASPPeptide
 from soamp.curation.smiles_gen import generate_smiles
@@ -57,7 +56,6 @@ DIFF_CSV = CFG.paths.data_dir / "dbaasp_vs_qmap_diff.csv"
 RECOVERED_CSV = CFG.paths.data_dir / "recovered_peptides.csv"
 OUT_CSV = CFG.paths.data_dir / "step5_standardized_mic.csv"
 LOG_PATH = CFG.paths.reports_dir / "step5_assay_unit_log.txt"
-TRACKER = build_tracker(CFG.tracking, CFG.paths.tracking_dir)
 
 
 def get_iqr(values):
@@ -77,8 +75,6 @@ def resolve_smiles_for_peptide(p: DBAASPPeptide):
 
 
 def main():
-    TRACKER.log_config(CFG.model_dump(mode="json"))
-
     raw_peptides = {}
     with open(RAW_JSONL) as f:
         for line in f:
@@ -280,7 +276,6 @@ def main():
     with open(LOG_PATH, "w") as f:
         f.write("\n".join(log_lines) + "\n")
     print("\n".join(log_lines))
-    TRACKER.close()
 
 
 if __name__ == "__main__":

@@ -2,7 +2,8 @@
   "name": "features_peptide",
   "type": "features",
   "metadata": {
-    "descriptor_names": [
+    "method": "rdkit_descriptors",
+    "feature_names": [
       "MolWt",
       "TPSA",
       "MolLogP",
@@ -29,5 +30,5 @@
       "bytes": 1452668
     }
   ],
-  "logged_at": 1786815028.490428
+  "logged_at": 1788630698.0928352
 }

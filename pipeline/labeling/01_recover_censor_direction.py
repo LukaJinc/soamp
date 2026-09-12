@@ -16,7 +16,6 @@ import csv
 
 from dotenv import load_dotenv
 
-from soamp.common.tracking import build_tracker
 from soamp.labeling.censoring import recover_bounds
 from soamp.labeling.config import LabelingConfig
 from soamp.utils.config import load_config
@@ -38,7 +37,6 @@ FINAL_CSV = CFG.paths.data_dir / "final_mic_regression_dataset.csv"
 RAW_JSONL = CFG.paths.cache_dir / "dbaasp_raw.jsonl"
 OUT_CSV = CFG.paths.data_dir / "mic_censor_direction.csv"
 LOG_PATH = CFG.paths.reports_dir / "labeling_step1_censor_direction_log.txt"
-TRACKER = build_tracker(CFG.tracking, CFG.paths.tracking_dir)
 
 FIELDNAMES = ["peptide_id", "organism", "recovery_status", "censor_type",
               "recovered_min_uM", "recovered_max_uM"]
@@ -46,7 +44,6 @@ FIELDNAMES = ["peptide_id", "organism", "recovery_status", "censor_type",
 
 def main() -> None:
     log = configure_logging("labeling.01_recover_censor_direction")
-    TRACKER.log_config(CFG.model_dump(mode="json"))
 
     with open(FINAL_CSV, newline="") as f:
         rows = list(csv.DictReader(f))
@@ -95,7 +92,6 @@ def main() -> None:
     with open(LOG_PATH, "w") as f:
         f.write("\n".join(log_lines) + "\n")
     log.info("\n".join(log_lines))
-    TRACKER.close()
 
 
 if __name__ == "__main__":

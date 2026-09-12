@@ -1,6 +1,0 @@
-_base_: base.yaml
-
-tracking:
-  exp_id: baseline_mlp_v1
-  backend: wandb
-  wandb_project: soamp

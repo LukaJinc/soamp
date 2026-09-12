@@ -1,0 +1,5 @@
+=== Features step 1: peptide feature computation ===
+Method: rdkit_descriptors
+Feature names: ['MolWt', 'TPSA', 'MolLogP', 'NumHDonors', 'NumHAcceptors', 'NumRotatableBonds', 'FractionCSP3', 'RingCount', 'NumAromaticRings', 'HeavyAtomCount', 'NumHeteroatoms', 'LabuteASA', 'FormalCharge']
+Unique peptides: 12371
+Wrote /Users/lukajin/PycharmProjects/soamp/data/peptide_features_rdkit.csv

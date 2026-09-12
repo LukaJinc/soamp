@@ -1,0 +1,15 @@
+# Peptide side of the featurization grid: RDKit physicochemical descriptors
+# (13 dims). Used by pipeline/features/01_build_peptide_features.py and
+# 03_fit_peptide_scaler.py.
+#
+# Output filenames are method-suffixed so all four grid cells' artifacts
+# coexist in data/ -- base.yaml's unsuffixed names would have each run
+# silently overwrite the previous one's.
+_base_: base.yaml
+
+peptide_featurization:
+  method: rdkit_descriptors
+
+output_files:
+  peptide_features_filename: peptide_features_rdkit.csv
+  peptide_feature_scaler_filename: peptide_feature_scaler_rdkit.json

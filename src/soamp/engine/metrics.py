@@ -1,12 +1,15 @@
 """Pure metric computation from raw prediction arrays -- no model/dataset/
 training-loop coupling.
 """
+from typing import Sequence
+
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 
 
 class MetricsError(ValueError):
-    """Raised when labels contains a single class (AUROC undefined)."""
+    """Raised when labels contains a single class (AUROC undefined), or when
+    organism_names doesn't align row-for-row with labels."""
 
 
 def logits_to_predictions(logits: np.ndarray, threshold: float = 0.5) -> np.ndarray:
@@ -31,17 +34,30 @@ def compute_binary_metrics(logits: np.ndarray, labels: np.ndarray) -> dict[str, 
 def compute_metrics_by_organism(
     logits: np.ndarray,
     labels: np.ndarray,
-    organism_idx: np.ndarray,
-    index_to_organism: dict[int, str],
+    organism_names: Sequence[str],
 ) -> dict[str, dict[str, float]]:
-    """Buckets by organism_idx, compute_binary_metrics() per bucket, adds
+    """Buckets by organism *name*, compute_binary_metrics() per bucket, adds
     'n' (row count) per bucket. A bucket with a single label class present
     is skipped with a {'skipped': 'single_class', 'n': ...} entry rather
     than raising -- a degenerate per-organism slice shouldn't kill the
-    whole eval."""
+    whole eval.
+
+    Takes names rather than the model's encoded organism input, so this works
+    identically for an "index" organism featurization (vocab_embedding) and a
+    "vector" one (kmer_composition), where there is no vocab to invert and the
+    encoded input is a float matrix. Callers pass the organism column straight
+    off the eval rows -- valid as long as the eval DataLoader is built with
+    shuffle=False, so row order is preserved.
+    """
+    organism_names = np.asarray(organism_names)
+    if len(organism_names) != len(labels):
+        raise MetricsError(
+            f"organism_names has {len(organism_names)} entries but there are "
+            f"{len(labels)} labels -- they must align row-for-row"
+        )
     result = {}
-    for idx, name in index_to_organism.items():
-        mask = organism_idx == idx
+    for name in sorted(set(organism_names.tolist())):
+        mask = organism_names == name
         n = int(mask.sum())
         if n == 0:
             continue

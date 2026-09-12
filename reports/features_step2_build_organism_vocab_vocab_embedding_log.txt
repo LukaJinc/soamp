@@ -1,0 +1,4 @@
+=== Features step 2: organism vocab ===
+Method: vocab_embedding
+Unique organisms in dataset: 3
+Wrote /Users/lukajin/PycharmProjects/soamp/data/organism_vocab_vocab_embedding.json

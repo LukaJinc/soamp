@@ -44,6 +44,7 @@
     456.870943990308,
     1.0
   ],
+  "method": "rdkit_descriptors",
   "fitted_on": "train split of data/mic_classification_dataset.csv",
   "n_peptides_fit": 8583
 }

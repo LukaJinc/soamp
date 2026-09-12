@@ -7,8 +7,6 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
-from soamp.common.tracking import TrackingConfig
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -18,9 +16,8 @@ class PathsConfig(BaseModel):
     data_dir: Path = Path("data")
     reports_dir: Path = Path("reports")
     checkpoint_dir: Path = Path("reports/checkpoints")
-    tracking_dir: Path = Path("reports/train_runs")
 
-    @field_validator("data_dir", "reports_dir", "checkpoint_dir", "tracking_dir", mode="after")
+    @field_validator("data_dir", "reports_dir", "checkpoint_dir", mode="after")
     @classmethod
     def _resolve_relative_to_repo_root(cls, v: Path) -> Path:
         return v if v.is_absolute() else REPO_ROOT / v
@@ -33,19 +30,43 @@ class InputFilesConfig(BaseModel):
     peptide_features_filename: str = "peptide_features.csv"
     organism_vocab_filename: str = "organism_vocab.json"
     peptide_feature_scaler_filename: str = "peptide_feature_scaler.json"
+    val_split_filename: str = "val_split.json"
 
 
-class SplitConfig(BaseModel):
+class BaselineClassifierConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    val_fraction: float = 0.1
+    organism_embed_dim: int = 8
+    hidden_dims: list[int] = [32, 16]
+
+
+class AttentionFusionClassifierConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    projection_dim: int = 128
+    num_attention_heads: int = 4
+    num_attention_layers: int = 1
+    hidden_dims: list[int] = [64, 32]
 
 
 class ModelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    organism_embed_dim: int = 8
-    hidden_dims: list[int] = [32, 16]
+    architecture: str = "baseline_classifier"
+    baseline_classifier: BaselineClassifierConfig = BaselineClassifierConfig()
+    attention_fusion_classifier: AttentionFusionClassifierConfig = AttentionFusionClassifierConfig()
+
+    @model_validator(mode="after")
+    def _architecture_must_be_known(self) -> "ModelConfig":
+        if self.architecture not in ("baseline_classifier", "attention_fusion_classifier"):
+            raise ValueError(
+                f"architecture must be 'baseline_classifier' or "
+                f"'attention_fusion_classifier', got {self.architecture!r}"
+            )
+        return self
+
+    def active_kwargs(self) -> dict:
+        return getattr(self, self.architecture).model_dump()
 
 
 class OptimConfig(BaseModel):
@@ -77,6 +98,19 @@ class LoopConfig(BaseModel):
     batch_size: int = 256
     seed: int = 42
     num_dataloader_workers: int = 0
+    # Passed to soamp.utils.device.resolve_device -- "auto" picks CUDA when
+    # available, so the same config runs on a laptop and a Colab GPU runtime.
+    device: str = "auto"
+
+
+# Which validation metric selects the "best" checkpoint, and whether a lower
+# value is better for it. Keys are the `val_*` names pipeline/train.py logs.
+BEST_METRIC_LOWER_IS_BETTER = {
+    "val_auroc": False,
+    "val_accuracy": False,
+    "val_f1": False,
+    "val_loss": True,
+}
 
 
 class CheckpointConfig(BaseModel):
@@ -85,16 +119,34 @@ class CheckpointConfig(BaseModel):
     save_every_n_epochs: int = 5
     best_metric: str = "val_auroc"
 
+    @field_validator("best_metric", mode="after")
+    @classmethod
+    def _best_metric_must_be_known(cls, v: str) -> str:
+        if v not in BEST_METRIC_LOWER_IS_BETTER:
+            raise ValueError(
+                f"best_metric must be one of "
+                f"{sorted(BEST_METRIC_LOWER_IS_BETTER)}, got {v!r}"
+            )
+        return v
+
+    @property
+    def lower_is_better(self) -> bool:
+        return BEST_METRIC_LOWER_IS_BETTER[self.best_metric]
+
 
 class TrainConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    exp_id: str = "baseline_mlp_v1"
     paths: PathsConfig = PathsConfig()
     input_files: InputFilesConfig = InputFilesConfig()
-    split: SplitConfig = SplitConfig()
     model: ModelConfig = ModelConfig()
     optim: OptimConfig = OptimConfig()
     class_balancing: ClassBalancingConfig = ClassBalancingConfig()
     loop: LoopConfig = LoopConfig()
     checkpoint: CheckpointConfig = CheckpointConfig()
-    tracking: TrackingConfig = TrackingConfig()
+    # Forwarded to wandb.init via build_tracker's **wandb_init_kwargs, so a
+    # set of related runs (e.g. one featurization grid) is grouped/filterable
+    # in the UI without any tracking-layer change.
+    wandb_group: str | None = None
+    wandb_tags: list[str] = []

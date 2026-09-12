@@ -1,0 +1,4 @@
+match_key,level,ncbi_taxon_id,refseq_assembly_accession,source,notes
+Escherichia coli,species,562,GCF_000005845.2,"NCBI Datasets v2 API, reference_only=true, 2026-09-09",
+Staphylococcus aureus,species,1280,GCF_000013425.1,"NCBI Datasets v2 API, reference_only=true, 2026-09-09",
+Pseudomonas aeruginosa,species,287,GCF_000006765.1,"NCBI Datasets v2 API, reference_only=true, 2026-09-09",

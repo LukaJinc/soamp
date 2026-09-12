@@ -1,14 +1,18 @@
 """PyTorch Dataset joining classification rows against precomputed peptide
-features + organism vocab.
+features + a fitted organism featurizer.
 
 Plain constructor args only -- no load_config() call inside the class, so
 it stays importable/testable without any CLI/config involvement.
 """
+from typing import TYPE_CHECKING
+
 import torch
 from torch.utils.data import Dataset
 
-from soamp.features.organism import encode
 from soamp.features.scaling import apply_scaler
+
+if TYPE_CHECKING:
+    from soamp.features.organism_featurizers import OrganismFeaturizer
 
 LABEL_TO_INT = {"inactive": 0, "active": 1}
 
@@ -26,8 +30,7 @@ class PeptideOrganismDataset(Dataset):
         descriptor_names: list[str],
         scaler_mean: list[float],
         scaler_scale: list[float],
-        organism_vocab: dict[str, int],
-        unknown_index: int = 0,
+        organism_featurizer: "OrganismFeaturizer",
     ) -> None:
         if not (len(descriptor_names) == len(scaler_mean) == len(scaler_scale)):
             raise PeptideOrganismDatasetError(
@@ -39,8 +42,7 @@ class PeptideOrganismDataset(Dataset):
         self.descriptor_names = descriptor_names
         self.scaler_mean = scaler_mean
         self.scaler_scale = scaler_scale
-        self.organism_vocab = organism_vocab
-        self.unknown_index = unknown_index
+        self.organism_featurizer = organism_featurizer
 
     def __len__(self) -> int:
         return len(self.rows)
@@ -56,11 +58,14 @@ class PeptideOrganismDataset(Dataset):
         raw_values = [features[name] for name in self.descriptor_names]
         scaled_values = apply_scaler(raw_values, self.scaler_mean, self.scaler_scale)
 
-        organism_idx = encode(self.organism_vocab, row["organism"], self.unknown_index)
+        organism_value = self.organism_featurizer.encode(row["organism"])
+        organism_dtype = (
+            torch.long if self.organism_featurizer.output_kind == "index" else torch.float32
+        )
         label = LABEL_TO_INT[row["label"]]
 
         return (
             torch.tensor(scaled_values, dtype=torch.float32),
-            torch.tensor(organism_idx, dtype=torch.long),
+            torch.tensor(organism_value, dtype=organism_dtype),
             torch.tensor(label, dtype=torch.float32),
         )

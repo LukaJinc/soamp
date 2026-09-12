@@ -1,0 +1,22 @@
+# Featurization-grid cell: rdkit_descriptors peptide features x kmer_composition organism features.
+# Architecture is held fixed at attention_fusion_classifier across all four
+# cells so the comparison isolates the representation, not the model --
+# BaselineClassifier feeds peptide features in raw, so a 768-dim PeptideCLM
+# vector would dominate its concat against an 8-dim organism embedding.
+_base_: base.yaml
+
+exp_id: rdkit_kmer_attnfusion
+
+model:
+  architecture: attention_fusion_classifier
+
+input_files:
+  peptide_features_filename: peptide_features_rdkit.csv
+  peptide_feature_scaler_filename: peptide_feature_scaler_rdkit.json
+  organism_vocab_filename: organism_vocab_kmer_composition.json
+
+wandb_group: featurization_grid_v1
+wandb_tags:
+  - rdkit_descriptors
+  - kmer_composition
+  - attention_fusion_classifier

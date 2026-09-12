@@ -1,0 +1,30 @@
+# Colab install set: only what pipeline/features/01-03 and pipeline/train.py
+# actually need, with pins relaxed so they resolve against a hosted runtime's
+# preinstalled stack.
+#
+# Install this FIRST, then `pip install -e . --no-deps` -- installing the
+# package with its own dependency set would drag in the exact pins below plus
+# the curation-only ones, and would replace Colab's CUDA-matched torch build.
+#
+# Deliberately absent:
+#   torch            -- keep the runtime's preinstalled CUDA build
+#   qmap-benchmark   -- imported function-locally (src/soamp/data/splitting.py),
+#                       never reached on the train path; the val split is read
+#                       from the precomputed data/val_split.json
+#   ete4, p2smi      -- curation stage only
+#   igraph, leidenalg -- only needed to *compute* a homology split, not apply one
+#
+# rdkit is required even for the peptideclm cells: src/soamp/features/peptide.py
+# imports it at module scope and src/soamp/data/factory.py imports that module.
+
+rdkit>=2024.3
+pandas>=2.2
+numpy>=1.26
+pyyaml>=6.0
+pydantic>=2.7
+scikit-learn>=1.4
+python-dotenv>=1.0
+transformers>=4.40
+SmilesPE==0.0.3
+wandb>=0.17
+requests>=2.31

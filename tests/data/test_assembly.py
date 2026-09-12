@@ -15,7 +15,7 @@ def _label_row(peptide_id, organism, label):
 
 
 def _regression_row(peptide_id, organism, sequence="AAA", smiles="C", mic_value_uM="10.0",
-                     mic_type="exact", taxon_id="562"):
+                     mic_type="exact", taxon_id="562", has_noncanonical="False"):
     return {
         "peptide_id": peptide_id,
         "organism": organism,
@@ -24,6 +24,7 @@ def _regression_row(peptide_id, organism, sequence="AAA", smiles="C", mic_value_
         "ncbi_taxon_id_if_available": taxon_id,
         "mic_value_uM": mic_value_uM,
         "mic_type": mic_type,
+        "has_noncanonical": has_noncanonical,
     }
 
 
@@ -58,6 +59,13 @@ def test_join_matches_by_peptide_id_and_organism():
     assert by_organism["Escherichia coli"]["label"] == "active"
     assert by_organism["Staphylococcus aureus"]["mic_value_uM"] == "50.0"
     assert by_organism["Staphylococcus aureus"]["label"] == "inactive"
+
+
+def test_join_carries_has_noncanonical_through():
+    regression_rows = [_regression_row("1", "Escherichia coli", has_noncanonical="True")]
+    filtered_label_rows = [_label_row("1", "Escherichia coli", "active")]
+    result = join_regression_and_labels(regression_rows, filtered_label_rows)
+    assert result[0]["has_noncanonical"] == "True"
 
 
 def test_join_raises_on_missing_regression_row():

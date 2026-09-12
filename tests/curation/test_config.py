@@ -23,18 +23,6 @@ def test_extra_nested_key_rejected():
         CurationConfig.model_validate({"paths": {"bogus_key": "x"}})
 
 
-def test_tracking_defaults():
-    cfg = load_config("config/curation/base.yaml", CurationConfig)
-    assert cfg.tracking.exp_id == "curation_pipeline"
-    assert cfg.tracking.backend == "local"
-    assert cfg.paths.tracking_dir.is_absolute()
-
-
-def test_tracking_extra_key_rejected():
-    with pytest.raises(ValidationError):
-        CurationConfig.model_validate({"tracking": {"bogus_key": "x"}})
-
-
 def test_base_override_composition(tmp_path):
     base = tmp_path / "base.yaml"
     base.write_text("split:\n  identity_threshold: 0.60\n")

@@ -1,7 +1,6 @@
 paths:
   data_dir: data
   reports_dir: reports
-  tracking_dir: reports/pipeline_runs
 
 input_files:
   regression_dataset_filename: final_mic_regression_dataset.csv
@@ -10,11 +9,13 @@ input_files:
 
 output:
   filename: mic_classification_dataset.csv
+  val_split_filename: val_split.json
 
 label_filter:
   included_labels: [active, inactive]
 
-tracking:
-  exp_id: dataset_pipeline
-  backend: local
-  wandb_project: soamp
+val_split:
+  val_fraction: 0.3
+  seed: 42
+  identity_threshold: 0.60
+  post_filtering: true

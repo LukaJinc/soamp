@@ -24,7 +24,6 @@ import json
 
 from dotenv import load_dotenv
 
-from soamp.common.tracking import build_tracker
 from soamp.data.assembly import FIELDNAMES, build_classification_dataset
 from soamp.data.config import DatasetConfig
 from soamp.utils.config import load_config
@@ -47,12 +46,10 @@ LABELS_CSV = CFG.paths.data_dir / CFG.input_files.activity_labels_filename
 SPLIT_JSON = CFG.paths.data_dir / CFG.input_files.split_indices_filename
 OUT_CSV = CFG.paths.data_dir / CFG.output.filename
 LOG_PATH = CFG.paths.reports_dir / "data_step1_build_classification_dataset_log.txt"
-TRACKER = build_tracker(CFG.tracking, CFG.paths.tracking_dir)
 
 
 def main() -> None:
     log = configure_logging("data.01_build_classification_dataset")
-    TRACKER.log_config(CFG.model_dump(mode="json"))
 
     with open(REGRESSION_CSV, newline="") as f:
         regression_rows = list(csv.DictReader(f))
@@ -85,14 +82,6 @@ def main() -> None:
         label_counts[r["label"]] = label_counts.get(r["label"], 0) + 1
         split_counts[r["split"]] = split_counts.get(r["split"], 0) + 1
 
-    TRACKER.log_artifact(
-        name="dataset_model_ready", artifact_type="dataset",
-        paths=[OUT_CSV],
-        metadata={"n_rows": len(out_rows), "organisms": organisms,
-                  "label_counts": label_counts, "split_counts": split_counts},
-        depends_on=["dataset_validated", "labels_threshold_derived", "splits_v1"],
-    )
-
     CFG.paths.reports_dir.mkdir(parents=True, exist_ok=True)
     log_lines = [
         "=== Data step 1: classification dataset assembly ===",
@@ -106,7 +95,6 @@ def main() -> None:
     with open(LOG_PATH, "w") as f:
         f.write("\n".join(log_lines) + "\n")
     log.info("\n".join(log_lines))
-    TRACKER.close()
 
 
 if __name__ == "__main__":
