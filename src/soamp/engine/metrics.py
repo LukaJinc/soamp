@@ -4,7 +4,7 @@ training-loop coupling.
 from typing import Sequence
 
 import numpy as np
-from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
 
 
 class MetricsError(ValueError):
@@ -18,8 +18,12 @@ def logits_to_predictions(logits: np.ndarray, threshold: float = 0.5) -> np.ndar
 
 
 def compute_binary_metrics(logits: np.ndarray, labels: np.ndarray) -> dict[str, float]:
-    """{'accuracy', 'f1', 'auroc'}. Raises MetricsError on single-class
-    labels -- surfaced loudly rather than silently NaN'd."""
+    """{'accuracy', 'f1', 'precision', 'recall', 'auroc'}. Raises MetricsError
+    on single-class labels -- surfaced loudly rather than silently NaN'd.
+    precision/recall use zero_division=0 (explicit, deterministic) rather
+    than sklearn's warning-and-NaN default -- a model that predicts no
+    positives at all has a well-defined precision of 0, not an undefined
+    value that would otherwise need special-casing downstream."""
     if len(set(labels.tolist())) < 2:
         raise MetricsError("labels contains a single class, AUROC is undefined")
     preds = logits_to_predictions(logits)
@@ -27,6 +31,8 @@ def compute_binary_metrics(logits: np.ndarray, labels: np.ndarray) -> dict[str, 
     return {
         "accuracy": float(accuracy_score(labels, preds)),
         "f1": float(f1_score(labels, preds)),
+        "precision": float(precision_score(labels, preds, zero_division=0)),
+        "recall": float(recall_score(labels, preds, zero_division=0)),
         "auroc": float(roc_auc_score(labels, probs)),
     }
 

@@ -81,6 +81,13 @@ def test_best_metric_lower_is_better_direction():
     ).checkpoint.lower_is_better
 
 
+@pytest.mark.parametrize("best_metric", ["val_precision", "val_recall"])
+def test_precision_recall_selectable_as_best_metric(best_metric):
+    cfg = TrainConfig.model_validate({"checkpoint": {"best_metric": best_metric}})
+    assert cfg.checkpoint.best_metric == best_metric
+    assert not cfg.checkpoint.lower_is_better
+
+
 def test_unknown_best_metric_rejected():
     """best_metric is indexed straight into the logged epoch-metrics dict, so a
     typo must fail at load time rather than KeyError mid-training."""
@@ -92,6 +99,11 @@ def test_wandb_group_and_tags_default_to_unset():
     cfg = load_config("config/train/base.yaml", TrainConfig)
     assert cfg.wandb_group is None
     assert cfg.wandb_tags == []
+
+
+def test_cv_folds_csv_filename_defaults():
+    cfg = load_config("config/train/base.yaml", TrainConfig)
+    assert cfg.cv.folds_csv_filename == "train_folds_leiden.csv"
 
 
 @pytest.mark.parametrize(

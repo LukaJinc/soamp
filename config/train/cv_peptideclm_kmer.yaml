@@ -1,0 +1,23 @@
+# Cross-validation counterpart to exp_peptideclm_kmer.yaml: same featurization grid
+# cell (peptide/organism method, architecture), run through
+# pipeline/train_cv.py's 5-fold CV instead of pipeline/train.py's single
+# held-out split. epochs=5 matches
+# scripts/EDA/build_dataset_build_model.ipynb's EPOCHS constant, not the
+# real run's 30 -- this is a faster cross-fold generalization estimate, not
+# the benchmark number.
+_base_: exp_peptideclm_kmer.yaml
+
+exp_id: peptideclm_kmer_cv
+
+loop:
+  epochs: 5
+
+# Distinct from featurization_grid_v1 -- cross-fold val metrics and the
+# real held-out test metrics measure different things and shouldn't mix in
+# wandb's comparison views.
+wandb_group: featurization_grid_cv_v1
+wandb_tags:
+  - peptideclm_embedding
+  - kmer_composition
+  - attention_fusion_classifier
+  - cv

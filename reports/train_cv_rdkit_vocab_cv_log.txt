@@ -1,0 +1,15 @@
+=== Train CV: rdkit_vocab_cv ===
+git_sha: dc07d6bfbbf034af5326a4c9b51e49e7a78f335e
+seed: 42
+device: cpu
+epochs per fold: 5
+folds: ['0', '1', '2', '3', '4']
+cv_results_df: /Users/lukajin/PycharmProjects/soamp/reports/cv_results_rdkit_vocab_cv.csv (85215 rows)
+mean +/- std across folds:
+            accuracy                  f1  ...    recall     auroc          
+                mean       std      mean  ...       std      mean       std
+eval_group                                ...                              
+fit         0.796267  0.023455  0.872159  ...  0.036182  0.822946  0.008152
+val         0.752523  0.069634  0.839039  ...  0.092028  0.763742  0.016608
+
+[2 rows x 10 columns]

@@ -1,0 +1,11 @@
+=== Train: peptideclm_kmer_attnfusion ===
+git_sha: dc07d6bfbbf034af5326a4c9b51e49e7a78f335e
+seed: 42
+epochs run: 30
+device: cuda
+best val_auroc: 0.8305 (epoch 6)
+test eval checkpoint: peptideclm_kmer_attnfusion_best.pth
+checkpoint_dir: /content/soamp/reports/checkpoints
+test rows: 7587
+test metrics (overall): {'accuracy': 0.7942533280611572, 'f1': 0.8667065152420801, 'auroc': 0.8347003505234748}
+test metrics (per organism): {'Escherichia coli': {'accuracy': 0.8216842823048074, 'f1': 0.8865263614666956, 'auroc': 0.854393677654766, 'n': 2933}, 'Pseudomonas aeruginosa': {'accuracy': 0.7975622681505035, 'f1': 0.8714670255720054, 'auroc': 0.8179073705912672, 'n': 1887}, 'Staphylococcus aureus': {'accuracy': 0.7629201301048066, 'f1': 0.8411622276029056, 'auroc': 0.8480359413441385, 'n': 2767}}

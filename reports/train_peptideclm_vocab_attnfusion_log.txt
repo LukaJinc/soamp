@@ -1,0 +1,11 @@
+=== Train: peptideclm_vocab_attnfusion ===
+git_sha: dc07d6bfbbf034af5326a4c9b51e49e7a78f335e
+seed: 42
+epochs run: 30
+device: cuda
+best val_auroc: 0.8260 (epoch 3)
+test eval checkpoint: peptideclm_vocab_attnfusion_best.pth
+checkpoint_dir: /content/soamp/reports/checkpoints
+test rows: 7587
+test metrics (overall): {'accuracy': 0.7348095426387241, 'f1': 0.8184115523465704, 'auroc': 0.8182338454603579}
+test metrics (per organism): {'Escherichia coli': {'accuracy': 0.7995226730310262, 'f1': 0.8700839593460009, 'auroc': 0.8567574468222636, 'n': 2933}, 'Pseudomonas aeruginosa': {'accuracy': 0.7095919448860626, 'f1': 0.7992673992673993, 'auroc': 0.7560106731743578, 'n': 1887}, 'Staphylococcus aureus': {'accuracy': 0.6834116371521504, 'f1': 0.7709205020920502, 'auroc': 0.839033124110989, 'n': 2767}}

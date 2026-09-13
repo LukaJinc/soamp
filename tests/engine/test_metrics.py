@@ -1,6 +1,12 @@
 import numpy as np
 import pytest
-from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 
 from soamp.engine.metrics import MetricsError, compute_binary_metrics, compute_metrics_by_organism
 
@@ -14,7 +20,29 @@ def test_compute_binary_metrics_matches_sklearn_directly():
     preds = (probs >= 0.5).astype(int)
     assert result["accuracy"] == pytest.approx(accuracy_score(labels, preds))
     assert result["f1"] == pytest.approx(f1_score(labels, preds))
+    assert result["precision"] == pytest.approx(precision_score(labels, preds, zero_division=0))
+    assert result["recall"] == pytest.approx(recall_score(labels, preds, zero_division=0))
     assert result["auroc"] == pytest.approx(roc_auc_score(labels, probs))
+
+
+def test_compute_binary_metrics_precision_recall_are_well_defined_when_no_positives_predicted():
+    """A model that predicts every row negative has a well-defined precision
+    of 0 (zero_division=0), not sklearn's default warning-and-NaN -- the
+    labels themselves still have both classes present, so this isn't the
+    MetricsError case."""
+    logits = np.array([-5.0, -5.0, -5.0])
+    labels = np.array([1, 0, 0])
+    result = compute_binary_metrics(logits, labels)
+    assert result["precision"] == 0.0
+    assert result["recall"] == 0.0
+
+
+def test_compute_binary_metrics_precision_recall_perfect_predictions():
+    logits = np.array([5.0, -5.0, 5.0, -5.0])
+    labels = np.array([1, 0, 1, 0])
+    result = compute_binary_metrics(logits, labels)
+    assert result["precision"] == 1.0
+    assert result["recall"] == 1.0
 
 
 def test_compute_binary_metrics_raises_on_single_class_labels():

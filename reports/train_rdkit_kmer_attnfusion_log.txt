@@ -1,0 +1,11 @@
+=== Train: rdkit_kmer_attnfusion ===
+git_sha: dc07d6bfbbf034af5326a4c9b51e49e7a78f335e
+seed: 42
+epochs run: 30
+device: cuda
+best val_auroc: 0.8070 (epoch 26)
+test eval checkpoint: rdkit_kmer_attnfusion_best.pth
+checkpoint_dir: /content/soamp/reports/checkpoints
+test rows: 7587
+test metrics (overall): {'accuracy': 0.74522209041782, 'f1': 0.8278257771443841, 'auroc': 0.8247195199233506}
+test metrics (per organism): {'Escherichia coli': {'accuracy': 0.7896351858165701, 'f1': 0.8618141097424412, 'auroc': 0.854667989612505, 'n': 2933}, 'Pseudomonas aeruginosa': {'accuracy': 0.6862745098039216, 'f1': 0.7805782060785768, 'auroc': 0.7590243372218191, 'n': 1887}, 'Staphylococcus aureus': {'accuracy': 0.738344777737622, 'f1': 0.8218503937007874, 'auroc': 0.839313743350244, 'n': 2767}}

@@ -1,0 +1,11 @@
+=== Train: rdkit_vocab_attnfusion ===
+git_sha: dc07d6bfbbf034af5326a4c9b51e49e7a78f335e
+seed: 42
+epochs run: 30
+device: cuda
+best val_auroc: 0.8201 (epoch 23)
+test eval checkpoint: rdkit_vocab_attnfusion_best.pth
+checkpoint_dir: /content/soamp/reports/checkpoints
+test rows: 7587
+test metrics (overall): {'accuracy': 0.7963621984974298, 'f1': 0.8676659528907923, 'auroc': 0.8330779299405704}
+test metrics (per organism): {'Escherichia coli': {'accuracy': 0.8179338561200137, 'f1': 0.883406113537118, 'auroc': 0.8530988767349523, 'n': 2933}, 'Pseudomonas aeruginosa': {'accuracy': 0.7726550079491256, 'f1': 0.8506787330316742, 'auroc': 0.78870165251875, 'n': 1887}, 'Staphylococcus aureus': {'accuracy': 0.7896638959161547, 'f1': 0.8621506395073425, 'auroc': 0.8455940939310799, 'n': 2767}}

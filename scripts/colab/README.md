@@ -7,6 +7,14 @@ Two notebooks, run in order:
 | `01_smoke_overfit.ipynb` | Builds all four (peptide × organism) featurizations, checks each produces the dimensions it claims and forwards through `attention_fusion_classifier`, then overfits ~256 rows per cell and asserts the loss reaches zero. Gate for notebook 02. |
 | `02_run_experiments.ipynb` | Builds the PeptideCLM feature artifact on the GPU (cached to Drive), then runs the four `config/train/exp_*.yaml` cells through `pipeline/train.py` and collects results from wandb. |
 
+A third path exists: driving Google's `google-colab-cli` (`colab new`/`colab
+exec`/`colab download`/...) directly from a local terminal instead of either
+notebook — no browser tab needed at all. It hits several real problems
+(a packaging bug in the CLI itself, an SSL cert issue, a kernel-state gotcha
+around editable installs, transient connection drops mid-run) — see
+[`CLI_TROUBLESHOOTING.md`](CLI_TROUBLESHOOTING.md) for all of them and their
+fixes before attempting this route.
+
 ## Colab Secrets
 
 Set these under the key icon in the left sidebar, with notebook access enabled:

@@ -109,6 +109,8 @@ BEST_METRIC_LOWER_IS_BETTER = {
     "val_auroc": False,
     "val_accuracy": False,
     "val_f1": False,
+    "val_precision": False,
+    "val_recall": False,
     "val_loss": True,
 }
 
@@ -134,6 +136,15 @@ class CheckpointConfig(BaseModel):
         return BEST_METRIC_LOWER_IS_BETTER[self.best_metric]
 
 
+class CVConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # Sequence-keyed fold assignments (soamp.engine.cross_validation reads
+    # this by "sequence", not "node_id"/"peptide_id" -- see that module's
+    # docstring for why the other two are the wrong join key).
+    folds_csv_filename: str = "train_folds_leiden.csv"
+
+
 class TrainConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -145,6 +156,9 @@ class TrainConfig(BaseModel):
     class_balancing: ClassBalancingConfig = ClassBalancingConfig()
     loop: LoopConfig = LoopConfig()
     checkpoint: CheckpointConfig = CheckpointConfig()
+    # Only read by pipeline/train_cv.py -- pipeline/train.py (the single
+    # held-out-split run) never touches this.
+    cv: CVConfig = CVConfig()
     # Forwarded to wandb.init via build_tracker's **wandb_init_kwargs, so a
     # set of related runs (e.g. one featurization grid) is grouped/filterable
     # in the UI without any tracking-layer change.
