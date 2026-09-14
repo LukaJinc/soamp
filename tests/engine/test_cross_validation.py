@@ -115,6 +115,44 @@ def test_train_and_evaluate_fold_only_evaluates_requested_groups():
     assert set(results_df["eval_group"]) == {"fit"}
 
 
+def test_train_and_evaluate_fold_forwards_peptide_and_organism_method_kwargs():
+    """This is the plumbing a caller relies on to share a PeptideCLMFeaturizer
+    cache dict across folds (peptide_method_kwargs={"cache": shared_dict}) --
+    verified here via a spy on build_dataset rather than exercising the real
+    PeptideCLM model."""
+    import soamp.engine.cross_validation as cv_module
+
+    rows = _make_peptide_rows(20)
+    row_groups = {"fit": rows[:15], "val": rows[15:]}
+    peptide_kwargs = {"descriptor_names": ["MolWt", "TPSA"]}
+    organism_kwargs = {"unknown_index": 0}
+
+    original_build_dataset = cv_module.build_dataset
+    calls = []
+
+    def spy(*args, **kwargs):
+        calls.append(kwargs)
+        return original_build_dataset(*args, **kwargs)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(cv_module, "build_dataset", spy)
+        train_and_evaluate_fold(
+            row_groups,
+            epochs=1,
+            seed=42,
+            peptide_method="rdkit_descriptors",
+            peptide_method_kwargs=peptide_kwargs,
+            organism_method="vocab_embedding",
+            organism_method_kwargs=organism_kwargs,
+            architecture="baseline_classifier",
+            device="cpu",
+        )
+
+    assert len(calls) == 1
+    assert calls[0]["peptide_method_kwargs"] == peptide_kwargs
+    assert calls[0]["organism_method_kwargs"] == organism_kwargs
+
+
 def test_summarize_cv_metrics_computes_mean_and_std_per_eval_group():
     fold_metrics_rows = [
         {"val_fold_id": 0, "eval_group": "fit", "accuracy": 0.8, "f1": 0.7},

@@ -237,3 +237,8 @@ data/clustering/
 # wandb artifact download cache (scripts/EDA/*.ipynb re-fetch these from the
 # run they were logged to; nothing reads them as a pipeline input).
 scripts/EDA/artifacts/
+
+# wandb artifact download cache written to the repo root by
+# pipeline/train_cv.py's round-trip verification (api.artifact(...).get(...)
+# defaults to caching here) -- same story as scripts/EDA/artifacts/ above.
+/artifacts/

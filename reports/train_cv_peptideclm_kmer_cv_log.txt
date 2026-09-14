@@ -1,5 +1,5 @@
 === Train CV: peptideclm_kmer_cv ===
-git_sha: dc07d6bfbbf034af5326a4c9b51e49e7a78f335e
+git_sha: b582b3e35e7c1f37d49330b125fb40a6e94959b9
 seed: 42
 device: cpu
 epochs per fold: 5
@@ -9,7 +9,7 @@ mean +/- std across folds:
             accuracy                  f1  ...    recall     auroc          
                 mean       std      mean  ...       std      mean       std
 eval_group                                ...                              
-fit         0.802772  0.021918  0.872743  ...  0.027137  0.902699  0.010432
-val         0.746418  0.048938  0.833276  ...  0.072965  0.797069  0.033980
+fit         0.809190  0.026022  0.877542  ...  0.033014  0.902354  0.009853
+val         0.741953  0.050059  0.830001  ...  0.074623  0.792689  0.034540
 
 [2 rows x 10 columns]

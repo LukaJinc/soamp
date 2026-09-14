@@ -111,13 +111,28 @@ def main() -> None:
         organism_method = json.load(f)["method"]
     log.info(f"peptide_method={peptide_method!r} organism_method={organism_method!r}")
 
+    # PeptideCLM embeddings are frozen/deterministic and don't depend on
+    # fold membership -- one dict shared across every build_dataset call
+    # below (the preview call and all 5 folds', each constructing a fresh
+    # PeptideCLMFeaturizer instance) means a peptide is embedded once,
+    # however many folds/calls it appears in, rather than up to 6 times.
+    # See PeptideCLMFeaturizer's docstring. A no-op for rdkit_descriptors.
+    peptide_feature_cache: dict = {}
+    peptide_method_kwargs = (
+        {"cache": peptide_feature_cache} if peptide_method == "peptideclm_embedding" else None
+    )
+
     # Built purely to source the real peptide/organism representation info
     # (method names, dims) build_tracker logs into the run config -- not
     # used for training/eval, since each fold below fits its own scaler/vocab
-    # on that fold's own fit partition.
+    # on that fold's own fit partition. Processes every unique peptide in
+    # train_rows, which -- with the shared cache above -- means this call
+    # alone does the one real PeptideCLM forward pass; every fold's call
+    # below is then a cache hit.
     preview_bundle = build_dataset(
         row_groups={"fit": train_rows},
         peptide_method=peptide_method,
+        peptide_method_kwargs=peptide_method_kwargs,
         organism_method=organism_method,
     )
     run = build_tracker(
@@ -159,6 +174,7 @@ def main() -> None:
             epochs=CFG.loop.epochs,
             seed=CFG.loop.seed,
             peptide_method=peptide_method,
+            peptide_method_kwargs=peptide_method_kwargs,
             organism_method=organism_method,
             architecture=CFG.model.architecture,
             architecture_kwargs=CFG.model.active_kwargs(),

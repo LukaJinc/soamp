@@ -69,6 +69,8 @@ def train_and_evaluate_fold(
     organism_method: str,
     architecture: str,
     architecture_kwargs: dict | None = None,
+    peptide_method_kwargs: dict | None = None,
+    organism_method_kwargs: dict | None = None,
     batch_size: int = 64,
     learning_rate: float = 1e-3,
     class_balancing_mode: str = "auto",
@@ -82,6 +84,14 @@ def train_and_evaluate_fold(
     exactly, generalized to take class-balancing and device as parameters
     (the notebook hardcodes "auto"/None and is CPU-only) -- defaults
     reproduce the notebook's behavior unchanged.
+
+    peptide_method_kwargs/organism_method_kwargs pass straight through to
+    build_dataset -- in particular, this is how a caller running multiple
+    folds shares one PeptideCLMFeaturizer cache dict across them (each fold
+    still constructs a fresh featurizer instance, but the same dict object
+    passed via peptide_method_kwargs={"cache": ...} makes embeddings
+    computed in an earlier fold get reused rather than recomputed; see
+    soamp.features.peptide_featurizers.PeptideCLMFeaturizer's docstring).
 
     Returns (metrics_by_group, results_df): metrics_by_group maps each
     eval_groups member to a compute_binary_metrics() dict; results_df is
@@ -99,8 +109,24 @@ def train_and_evaluate_fold(
         resolved_device = resolve_device(device)
 
     bundle = build_dataset(
-        row_groups=row_groups, peptide_method=peptide_method, organism_method=organism_method
+        row_groups=row_groups,
+        peptide_method=peptide_method,
+        peptide_method_kwargs=peptide_method_kwargs,
+        organism_method=organism_method,
+        organism_method_kwargs=organism_method_kwargs,
     )
+
+    # Re-seed immediately before model construction, not just once at the top
+    # of this function: a peptide featurizer's forward pass (e.g.
+    # PeptideCLMFeaturizer, uncached) measurably advances torch's global RNG
+    # state (verified directly -- a fresh compute leaves torch.rand() at a
+    # different point than a cache hit does), which would otherwise make the
+    # model's weight initialization depend on how much of build_dataset's
+    # internal work happened to consume RNG -- including, concretely,
+    # whether a given peptide was a cache hit or miss. Reseeding here
+    # decouples model-init/training determinism from that entirely, so
+    # `seed` alone controls the model regardless of featurization caching.
+    torch.manual_seed(seed)
     model = build_model(bundle, architecture=architecture, **(architecture_kwargs or {}))
 
     fit_loader = DataLoader(bundle.datasets["fit"], batch_size=batch_size, shuffle=True)

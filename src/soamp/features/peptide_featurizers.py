@@ -57,6 +57,17 @@ class PeptideCLMFeaturizer:
     when available). This forward pass is the one genuinely GPU-bound step in
     the pipeline -- the downstream classifier is a small MLP -- so on a CUDA
     runtime it is the difference between minutes and seconds for a full corpus.
+
+    `cache`: pass a shared dict to reuse embeddings across multiple
+    PeptideCLMFeaturizer instances/calls -- e.g. k-fold cross-validation,
+    where soamp.data.factory.build_dataset(row_groups=...) constructs a
+    fresh instance every fold, but the same peptide_id recurs across folds'
+    fit/val partitions. Embeddings are frozen/deterministic, so caching by
+    peptide_id is exact, not an approximation: a cache hit returns the
+    identical vector a fresh compute would have produced. Defaults to a
+    private, empty, per-instance dict, so a caller that never passes
+    `cache=` (e.g. pipeline/features/01_build_peptide_features.py's single
+    call) sees no behavior change.
     """
 
     HIDDEN_SIZE = 768
@@ -67,6 +78,7 @@ class PeptideCLMFeaturizer:
         max_length: int = 512,
         checkpoint: str = "aaronfeller/PeptideCLM-23M-all",
         device: str = "auto",
+        cache: dict[str, dict] | None = None,
     ) -> None:
         self.batch_size = batch_size
         self.max_length = max_length
@@ -76,6 +88,7 @@ class PeptideCLMFeaturizer:
         self.feature_names = [f"dim_{i}" for i in range(self.HIDDEN_SIZE)]
         self._tokenizer = None
         self._model = None
+        self._cache: dict[str, dict] = cache if cache is not None else {}
 
     def _ensure_loaded(self) -> None:
         if self._model is not None:
@@ -100,6 +113,16 @@ class PeptideCLMFeaturizer:
         pass  # frozen pretrained weights, nothing to fit
 
     def transform(self, unique_peptides: list[dict]) -> list[dict]:
+        """Cache-checking wrapper -- computes only the peptide_ids missing
+        from self._cache, then returns every requested row from the cache
+        (including ones a previous call already populated)."""
+        to_compute = [p for p in unique_peptides if p["peptide_id"] not in self._cache]
+        if to_compute:
+            for row in self._transform_uncached(to_compute):
+                self._cache[row["peptide_id"]] = row
+        return [self._cache[p["peptide_id"]] for p in unique_peptides]
+
+    def _transform_uncached(self, unique_peptides: list[dict]) -> list[dict]:
         import numpy as np
         import torch
 
