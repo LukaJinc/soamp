@@ -1,11 +1,14 @@
 # Running soamp on Google Colab
 
-Two notebooks, run in order:
+Three notebooks:
 
 | Notebook | What it does |
 |---|---|
-| `01_smoke_overfit.ipynb` | Builds all four (peptide × organism) featurizations, checks each produces the dimensions it claims and forwards through `attention_fusion_classifier`, then overfits ~256 rows per cell and asserts the loss reaches zero. Gate for notebook 02. |
-| `02_run_experiments.ipynb` | Builds the PeptideCLM feature artifact on the GPU (cached to Drive), then runs the four `config/train/exp_*.yaml` cells through `pipeline/train.py` and collects results from wandb. |
+| `01_smoke_overfit.ipynb` | Builds all four (peptide × organism) featurizations, checks each produces the dimensions it claims and forwards through `attention_fusion_classifier`, then overfits ~256 rows per cell and asserts the loss reaches zero. Gate for notebooks 02 and 03. |
+| `02_run_experiments.ipynb` | Builds the PeptideCLM feature artifact on the GPU (cached to Drive), then runs the four `config/train/exp_*.yaml` cells through `pipeline/train.py` (single held-out train/val/test split) and collects results from wandb. |
+| `03_run_cv_experiments.ipynb` | CV counterpart to 02: builds/reuses the same PeptideCLM feature artifact, then runs the four `config/train/cv_*.yaml` cells through `pipeline/train_cv.py` (5-fold CV over `data/train_folds_leiden.csv`, train split only — no checkpoints, `test` never touched) and collects results from wandb. |
+
+Run 01 first as a gate; 02 and 03 are independent of each other (each rebuilds/reuses its own PeptideCLM cache) and can run in either order.
 
 A third path exists: driving Google's `google-colab-cli` (`colab new`/`colab
 exec`/`colab download`/...) directly from a local terminal instead of either
@@ -20,9 +23,10 @@ fixes before attempting this route.
 Set these under the key icon in the left sidebar, with notebook access enabled:
 
 - `GITHUB_TOKEN` — a fine-grained, **read-only** PAT for this private repo.
-  Both notebooks clone with the token inline, scrub it from the printed output,
-  then rewrite the remote to the plain URL so it never lands in `.git/config`.
-- `WANDB_API_KEY` — required by notebook 02; notebook 01 never opens a tracker.
+  All three notebooks clone with the token inline, scrub it from the printed
+  output, then rewrite the remote to the plain URL so it never lands in
+  `.git/config`.
+- `WANDB_API_KEY` — required by notebooks 02 and 03; notebook 01 never opens a tracker.
 - `WANDB_ENTITY` — optional, only if your runs shouldn't go to your default entity.
 
 ## Experiment grid
@@ -41,6 +45,13 @@ comparison worth running against the 13-dim RDKit cell.
 | `peptideclm_kmer_attnfusion` | `peptideclm_embedding` (768d) | `kmer_composition` (340d vector) |
 
 All four land in wandb project `soamp`, group `featurization_grid_v1`.
+
+The CV counterpart (`03_run_cv_experiments.ipynb`, `config/train/cv_*.yaml`,
+`exp_id`s `{rdkit,peptideclm}_{vocab,kmer}_cv`) runs the same four cells
+through `pipeline/train_cv.py`'s 5-fold CV instead, logging to a separate
+group, `featurization_grid_cv_v1` — cross-fold `{fit,val}_<metric>_{mean,std}`
+summary keys, no `test_*` keys (CV never touches test) and no checkpoints
+(`pipeline/train_cv.py` never invokes a `Checkpointer`).
 
 ## Feature artifacts
 
@@ -81,10 +92,17 @@ So the leanest workflow is often:
        python pipeline/train.py --config config/train/exp_${cell}.yaml
    done
    ```
+   And/or the CV counterpart (`data/train_folds_leiden.csv` is committed, so
+   no extra setup is needed):
+   ```
+   for cell in rdkit_vocab rdkit_kmer peptideclm_vocab peptideclm_kmer; do
+       python pipeline/train_cv.py --config config/train/cv_${cell}.yaml
+   done
+   ```
 
-Same configs, same entrypoint, same wandb grid — no session timeouts, no clone,
-full git provenance. Use the notebooks when you want the GPU or a clean-room
-environment; use the loop above otherwise.
+Same configs, same entrypoints, same wandb grids — no session timeouts, no
+clone, full git provenance. Use the notebooks when you want the GPU or a
+clean-room environment; use the loops above otherwise.
 
 ## Local equivalent of notebook 01
 
