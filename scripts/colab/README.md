@@ -68,9 +68,14 @@ The PeptideCLM artifact exceeds GitHub's per-file limit, so it is gitignored and
 rebuilt per environment — seconds on a GPU, ~5 min on CPU — then cached to
 `MyDrive/soamp_cache/`.
 
-The k-mer organism artifact bakes its genome vectors in, so training needs
-neither the RefSeq FASTAs nor network access. Only notebook 01 fetches genomes,
-because it computes featurization fresh from rows rather than from that artifact.
+The k-mer organism artifact bakes its genome vectors in, so `02`'s training run
+needs neither the RefSeq FASTAs nor network access — it reconstructs the
+featurizer straight from that committed artifact (`train.py`'s artifact mode,
+`row_groups=None`). Notebooks 01 and 03 both fetch genomes anyway, because
+both compute featurization fresh from rows (`row_groups=...`, via
+`build_dataset` and `train_cv.py` respectively) rather than reading that
+artifact — `train_cv.py` refits the organism featurizer per fold on purpose,
+so it needs the raw FASTAs even though the same committed artifact exists.
 
 ## Is Colab actually the right place for this?
 

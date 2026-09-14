@@ -26,7 +26,15 @@ def parse_fasta_sequences(path) -> list[str]:
     compute_kmer_composition sums counts across all of them."""
     sequences: list[str] = []
     current: list[str] = []
-    with open(path) as f:
+    try:
+        f = open(path)
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"Genome FASTA not found: {path}. Run "
+            "pipeline/features/00_fetch_organism_genomes.py to populate the "
+            "genome cache before fitting a kmer_composition organism featurizer."
+        ) from None
+    with f:
         for line in f:
             line = line.strip()
             if not line:
