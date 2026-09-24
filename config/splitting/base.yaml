@@ -1,0 +1,34 @@
+paths:
+  data_dir: data
+  reports_dir: reports
+
+input_files:
+  classification_dataset_filename: mic_classification_dataset.csv
+
+output:
+  filename: peptide_split.csv
+  sidecar_filename: peptide_split.json
+
+fingerprint_graph:
+  fingerprint_threshold: 0.8
+  radius: 2
+  n_bits: 2048
+
+qmap_graph:
+  identity_threshold: 0.60
+  matrix: blosum45
+  gap_open: 5
+  gap_extension: 1
+  use_cache: true
+  num_threads: null
+
+leiden:
+  n_iterations: 2
+  seed: 42
+
+bucketing:
+  test_size: 0.2
+  n_folds: 5
+  lambda_noncanonical: 8.0
+  n_iterations: 40000
+  seed: 42

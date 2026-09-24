@@ -1,0 +1,54 @@
+{
+  "method": "union graph (Morgan/ECFP Tanimoto >= fingerprint_threshold OR QMAP BLOSUM45 identity >= identity_threshold, both computed once and unioned) -> qmap.toolkit leiden_community_detection -> stratified whole-cluster bucket assignment (test + n_folds CV folds, balanced toward the dataset-wide has_noncanonical rate)",
+  "n_peptides": 12371,
+  "fingerprint_threshold": 0.8,
+  "fingerprint_radius": 2,
+  "fingerprint_n_bits": 2048,
+  "identity_threshold": 0.6,
+  "identity_matrix": "blosum45",
+  "identity_gap_open": 5,
+  "identity_gap_extension": 1,
+  "leiden_n_iterations": 2,
+  "leiden_seed": 42,
+  "test_size": 0.2,
+  "n_folds": 5,
+  "bucket_lambda_noncanonical": 8.0,
+  "bucket_n_iterations": 40000,
+  "bucket_seed": 42,
+  "n_clusters": 673,
+  "largest_cluster_fraction": 0.09295934039285425,
+  "dataset_has_noncanonical_fraction": 0.20063050683049066,
+  "n_qmap_unscoreable_peptides": 1483,
+  "bucket_stats": {
+    "test": {
+      "n_peptides": 2473,
+      "target_size_fraction": 0.2,
+      "has_noncanonical_fraction": 0.20016174686615446
+    },
+    "fold_0": {
+      "n_peptides": 1978,
+      "target_size_fraction": 0.16,
+      "has_noncanonical_fraction": 0.20020222446916078
+    },
+    "fold_1": {
+      "n_peptides": 1979,
+      "target_size_fraction": 0.16,
+      "has_noncanonical_fraction": 0.20060636685194544
+    },
+    "fold_2": {
+      "n_peptides": 1978,
+      "target_size_fraction": 0.16,
+      "has_noncanonical_fraction": 0.20020222446916078
+    },
+    "fold_3": {
+      "n_peptides": 1978,
+      "target_size_fraction": 0.16,
+      "has_noncanonical_fraction": 0.20020222446916078
+    },
+    "fold_4": {
+      "n_peptides": 1985,
+      "target_size_fraction": 0.16,
+      "has_noncanonical_fraction": 0.20251889168765744
+    }
+  }
+}
