@@ -8,47 +8,81 @@
   "identity_matrix": "blosum45",
   "identity_gap_open": 5,
   "identity_gap_extension": 1,
+  "hard_link_fingerprint_threshold": 0.95,
+  "hard_link_identity_threshold": 0.9,
+  "n_hard_links": 41723,
+  "n_hard_link_groups": 5033,
+  "cross_bucket_edges": {
+    "fingerprint": 25626,
+    "qmap": 13841,
+    "hard_links": 0,
+    "fingerprint_total": 256689,
+    "qmap_total": 185021
+  },
   "leiden_n_iterations": 2,
   "leiden_seed": 42,
   "test_size": 0.2,
   "n_folds": 5,
-  "bucket_lambda_noncanonical": 8.0,
-  "bucket_n_iterations": 40000,
+  "bucket_lambda_noncanonical": 30.0,
+  "bucket_lambda_active": 30.0,
+  "balanced_over": "records",
+  "bucket_n_iterations": 100000,
   "bucket_seed": 42,
-  "n_clusters": 673,
-  "largest_cluster_fraction": 0.09295934039285425,
+  "n_clusters": 672,
+  "largest_cluster_fraction": 0.15439333926117532,
   "dataset_has_noncanonical_fraction": 0.20063050683049066,
   "n_qmap_unscoreable_peptides": 1483,
+  "dataset_n_rows": 24630,
+  "dataset_active_fraction_rows": 0.8419001218026797,
+  "dataset_has_noncanonical_fraction_rows": 0.20515631343889565,
   "bucket_stats": {
     "test": {
-      "n_peptides": 2473,
+      "n_peptides": 2363,
+      "n_rows": 4929,
       "target_size_fraction": 0.2,
-      "has_noncanonical_fraction": 0.20016174686615446
+      "has_noncanonical_fraction": 0.20101565806178587,
+      "has_noncanonical_fraction_rows": 0.2063298843578819,
+      "active_fraction_rows": 0.8429701765063907
     },
     "fold_0": {
-      "n_peptides": 1978,
+      "n_peptides": 1914,
+      "n_rows": 3903,
       "target_size_fraction": 0.16,
-      "has_noncanonical_fraction": 0.20020222446916078
+      "has_noncanonical_fraction": 0.19383490073145246,
+      "has_noncanonical_fraction_rows": 0.20497053548552396,
+      "active_fraction_rows": 0.8426851140148603
     },
     "fold_1": {
-      "n_peptides": 1979,
+      "n_peptides": 2015,
+      "n_rows": 3995,
       "target_size_fraction": 0.16,
-      "has_noncanonical_fraction": 0.20060636685194544
+      "has_noncanonical_fraction": 0.19205955334987593,
+      "has_noncanonical_fraction_rows": 0.20500625782227785,
+      "active_fraction_rows": 0.8377972465581978
     },
     "fold_2": {
-      "n_peptides": 1978,
+      "n_peptides": 1947,
+      "n_rows": 3915,
       "target_size_fraction": 0.16,
-      "has_noncanonical_fraction": 0.20020222446916078
+      "has_noncanonical_fraction": 0.18849512069851052,
+      "has_noncanonical_fraction_rows": 0.20510855683269477,
+      "active_fraction_rows": 0.8421455938697318
     },
     "fold_3": {
-      "n_peptides": 1978,
+      "n_peptides": 2136,
+      "n_rows": 3903,
       "target_size_fraction": 0.16,
-      "has_noncanonical_fraction": 0.20020222446916078
+      "has_noncanonical_fraction": 0.21301498127340823,
+      "has_noncanonical_fraction_rows": 0.20497053548552396,
+      "active_fraction_rows": 0.8426851140148603
     },
     "fold_4": {
-      "n_peptides": 1985,
+      "n_peptides": 1996,
+      "n_rows": 3985,
       "target_size_fraction": 0.16,
-      "has_noncanonical_fraction": 0.20251889168765744
+      "has_noncanonical_fraction": 0.21392785571142284,
+      "has_noncanonical_fraction_rows": 0.2042659974905897,
+      "active_fraction_rows": 0.8429109159347553
     }
   }
 }

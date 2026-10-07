@@ -7,8 +7,9 @@ from soamp.splitting.build import (
 )
 
 
-def _row(peptide_id, organism, sequence, smiles, has_noncanonical):
+def _row(peptide_id, organism, sequence, smiles, has_noncanonical, label="active"):
     return {
+        "label": label,
         "peptide_id": peptide_id,
         "organism": organism,
         "sequence": sequence,
@@ -28,6 +29,19 @@ def test_unique_peptides_for_splitting_dedups_across_organisms():
     assert {p["peptide_id"] for p in peptides} == {"1", "2"}
     p2 = next(p for p in peptides if p["peptide_id"] == "2")
     assert p2["has_noncanonical"] is True
+    p1 = next(p for p in peptides if p["peptide_id"] == "1")
+    assert (p1["n_rows"], p1["n_active"]) == (2, 2)
+    assert (p2["n_rows"], p2["n_active"]) == (1, 1)
+
+
+def test_unique_peptides_for_splitting_counts_records_and_active():
+    rows = [
+        _row("1", "E", "AAAAAAAAAA", "CCO", False, label="active"),
+        _row("1", "S", "AAAAAAAAAA", "CCO", False, label="inactive"),
+        _row("1", "P", "AAAAAAAAAA", "CCO", False, label="active"),
+    ]
+    (p,) = unique_peptides_for_splitting(rows)
+    assert (p["n_rows"], p["n_active"]) == (3, 2)
 
 
 def test_unique_peptides_for_splitting_raises_on_conflict():
@@ -95,3 +109,24 @@ def test_build_peptide_split_is_deterministic():
     r1 = build_peptide_split(_TEST_PEPTIDES, **kwargs)
     r2 = build_peptide_split(_TEST_PEPTIDES, **kwargs)
     assert r1.rows == r2.rows
+
+
+def test_build_peptide_split_never_separates_hard_linked_peptides():
+    # Many peptides with identical SMILES to peptide "0" must share its bucket.
+    peptides = [
+        {"peptide_id": str(i), "sequence": "ACDEFGHIKL"[: 10] if i else "ACDEFGHIKL",
+         "smiles": "CC(=O)Oc1ccccc1C(=O)O", "has_noncanonical": False}
+        for i in range(6)
+    ] + [
+        {"peptide_id": f"u{i}", "sequence": "MPRTQSILVK"[:9] + "ACDEFGHIKLMNPQRSTVWY"[i],
+         "smiles": "C" * (i + 3), "has_noncanonical": i % 2 == 0}
+        for i in range(20)
+    ]
+    for p in peptides:
+        p["n_rows"], p["n_active"] = 2, 1
+    result = build_peptide_split(
+        peptides, test_size=0.3, n_folds=2, bucket_n_iterations=500, identity_show_progress=False
+    )
+    by_id = {r["peptide_id"]: (r["split"], r["fold_id"]) for r in result.rows}
+    assert len({by_id[str(i)] for i in range(6)}) == 1
+    assert result.sidecar["cross_bucket_edges"]["hard_links"] == 0

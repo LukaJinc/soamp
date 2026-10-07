@@ -145,3 +145,72 @@ def test_stratified_cluster_split_raises_on_bad_n_folds():
     node_communities = pd.DataFrame({"node_id": [0, 1], "community": [0, 1]})
     with pytest.raises(BucketingError):
         stratified_cluster_split(node_communities, ["a", "b"], [False, False], n_folds=1)
+
+
+def _synthetic_active_counts(sizes, seed=3):
+    rng = np.random.default_rng(seed)
+    return {c: int(round(s * rng.choice([0.2, 0.6, 0.95, 1.0]))) for c, s in sizes.items()}
+
+
+def test_assign_balances_active_rate_better_than_ignoring_it():
+    sizes, ncs = _synthetic_clusters()
+    acts = _synthetic_active_counts(sizes)
+
+    def spread(lam):
+        result = assign_clusters_to_buckets(
+            sizes, ncs, _TARGETS, cluster_active_counts=acts,
+            lambda_active=lam, n_iterations=5000, seed=1,
+        )
+        size = {b: 0 for b in _TARGETS}
+        act = {b: 0 for b in _TARGETS}
+        for c, b in result.items():
+            size[b] += sizes[c]
+            act[b] += acts[c]
+        rates = [act[b] / size[b] for b in _TARGETS if size[b] > 0]
+        return max(rates) - min(rates)
+
+    assert spread(lam=10.0) < spread(lam=0.0)
+
+
+def test_assign_raises_when_active_exceeds_size_or_keys_mismatch():
+    with pytest.raises(BucketingError):
+        assign_clusters_to_buckets(
+            {1: 5, 2: 5}, {1: 0, 2: 0}, {"test": 0.5, "train": 0.5},
+            cluster_active_counts={1: 6, 2: 0},
+        )
+    with pytest.raises(BucketingError):
+        assign_clusters_to_buckets(
+            {1: 5, 2: 5}, {1: 0, 2: 0}, {"test": 0.5, "train": 0.5},
+            cluster_active_counts={1: 1},
+        )
+
+
+def test_stratified_split_record_weighted_never_splits_a_cluster_and_reports_rates():
+    # 40 two-peptide clusters; peptides carry different numbers of records.
+    n = 80
+    node_communities = pd.DataFrame({"node_id": range(n), "community": [i // 2 for i in range(n)]})
+    peptide_ids = [str(i) for i in range(n)]
+    rng = np.random.default_rng(0)
+    row_counts = [int(r) for r in rng.integers(1, 4, size=n)]
+    active_counts = [int(rng.integers(0, r + 1)) for r in row_counts]
+    result = stratified_cluster_split(
+        node_communities, peptide_ids, [i % 5 == 0 for i in range(n)],
+        row_counts=row_counts, active_counts=active_counts,
+        test_size=0.2, n_folds=4, lambda_active=10.0, n_iterations=3000,
+    )
+    for c in range(n // 2):
+        a, b = peptide_ids[2 * c], peptide_ids[2 * c + 1]
+        assert result.split_by_peptide_id[a] == result.split_by_peptide_id[b]
+        assert result.fold_by_peptide_id[a] == result.fold_by_peptide_id[b]
+    assert sum(s["n_rows"] for s in result.bucket_stats.values()) == sum(row_counts)
+    assert all("active_fraction_rows" in s for s in result.bucket_stats.values())
+
+
+def test_stratified_split_rejects_active_without_rows_or_exceeding_rows():
+    nc = pd.DataFrame({"node_id": [0, 1], "community": [0, 1]})
+    with pytest.raises(BucketingError):
+        stratified_cluster_split(nc, ["a", "b"], [False, False], active_counts=[1, 1])
+    with pytest.raises(BucketingError):
+        stratified_cluster_split(
+            nc, ["a", "b"], [False, False], row_counts=[1, 1], active_counts=[2, 0]
+        )

@@ -86,3 +86,23 @@ def test_build_union_graph_keeps_isolated_nodes():
     graph = build_union_graph(4, fp_edges, {})
     assert graph.vcount() == 4
     assert graph.ecount() == 1
+
+
+def test_duplicate_pairs_links_identical_smiles_and_non_x_sequences_only():
+    from soamp.splitting.graph import duplicate_pairs
+
+    sequences = ["AAAA", "aaaa", "AXAA", "AXAA", "KKKK"]
+    smiles = ["C1", "C2", "C3", "C4", "C1"]
+    # (0,1) same sequence case-folded; (0,4) same SMILES; X-sequences 2,3 are
+    # NOT linked by sequence (different non-canonical residues, different SMILES).
+    assert duplicate_pairs(sequences, smiles) == [(0, 1), (0, 4)]
+
+
+def test_contract_hard_links_groups_linked_nodes_and_drops_self_loops():
+    from soamp.splitting.graph import contract_hard_links
+
+    graph, node_of = contract_hard_links(5, [(0, 1), (1, 2)], {(0, 1): 1.0, (2, 3): 0.7, (3, 4): 0.7})
+    assert node_of[0] == node_of[1] == node_of[2]
+    assert len({node_of[0], node_of[3], node_of[4]}) == 3
+    assert graph.vcount() == 3 and graph.ecount() == 2
+    assert not any(a == b for a, b in graph.get_edgelist())

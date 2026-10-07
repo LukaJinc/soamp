@@ -54,6 +54,17 @@ class QMAPGraphConfig(BaseModel):
     num_threads: int | None = None
 
 
+class HardLinkConfig(BaseModel):
+    """Pairs at or above these similarities (plus identical SMILES / identical
+    non-X sequences) are forced into the same bucket by merging their
+    communities before balancing."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    fingerprint_threshold: float = 0.95
+    identity_threshold: float = 0.90
+
+
 class LeidenConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -66,8 +77,9 @@ class BucketingConfig(BaseModel):
 
     test_size: float = 0.2
     n_folds: int = 5
-    lambda_noncanonical: float = 8.0
-    n_iterations: int = 40_000
+    lambda_noncanonical: float = 30.0
+    lambda_active: float = 30.0
+    n_iterations: int = 100_000
     seed: int = 42
 
 
@@ -79,5 +91,6 @@ class SplittingConfig(BaseModel):
     output: OutputConfig = OutputConfig()
     fingerprint_graph: FingerprintGraphConfig = FingerprintGraphConfig()
     qmap_graph: QMAPGraphConfig = QMAPGraphConfig()
+    hard_links: HardLinkConfig = HardLinkConfig()
     leiden: LeidenConfig = LeidenConfig()
     bucketing: BucketingConfig = BucketingConfig()

@@ -6,45 +6,61 @@ import pytest
 
 from soamp.engine.cross_validation import (
     CrossValidationError,
-    assign_fold_ids,
-    load_fold_assignments,
+    assign_train_folds,
+    load_peptide_split,
     summarize_cv_metrics,
     train_and_evaluate_fold,
 )
 
 
-def _write_folds_csv(path, rows):
+def _write_split_csv(path, rows):
     with open(path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["node_id", "community", "sequence", "fold_id"])
+        writer = csv.DictWriter(
+            f, fieldnames=["peptide_id", "community", "split", "fold_id", "has_noncanonical"]
+        )
         writer.writeheader()
         writer.writerows(rows)
 
 
-def test_load_fold_assignments_keys_by_sequence_not_node_id(tmp_path):
-    """The whole point of this module: node_id is an igraph vertex index,
-    not this dataset's peptide_id -- sequence is the only sound join key."""
-    path = tmp_path / "folds.csv"
-    _write_folds_csv(path, [
-        {"node_id": "0", "community": "5", "sequence": "AAA", "fold_id": "0"},
-        {"node_id": "1", "community": "5", "sequence": "BBB", "fold_id": "1"},
+def test_load_peptide_split_parses_train_folds_and_test(tmp_path):
+    path = tmp_path / "split.csv"
+    _write_split_csv(path, [
+        {"peptide_id": "1", "community": "5", "split": "train", "fold_id": "0", "has_noncanonical": "False"},
+        {"peptide_id": "2", "community": "6", "split": "train", "fold_id": "3.0", "has_noncanonical": "True"},
+        {"peptide_id": "3", "community": "7", "split": "test", "fold_id": "", "has_noncanonical": "False"},
     ])
-    result = load_fold_assignments(path)
-    assert result == {"AAA": "0", "BBB": "1"}
+    assert load_peptide_split(path) == {
+        "1": {"split": "train", "fold_id": "0"},
+        "2": {"split": "train", "fold_id": "3"},
+        "3": {"split": "test", "fold_id": None},
+    }
 
 
-def test_assign_fold_ids_adds_fold_id_without_mutating_input():
-    rows = [{"peptide_id": "p1", "sequence": "AAA"}, {"peptide_id": "p2", "sequence": "BBB"}]
-    fold_by_sequence = {"AAA": "0", "BBB": "1"}
-    result = assign_fold_ids(rows, fold_by_sequence)
-    assert [r["fold_id"] for r in result] == ["0", "1"]
+def test_assign_train_folds_keeps_train_only_adds_fold_without_mutating_input():
+    rows = [{"peptide_id": "p1"}, {"peptide_id": "p2"}, {"peptide_id": "p3"}]
+    split = {
+        "p1": {"split": "train", "fold_id": "0"},
+        "p2": {"split": "train", "fold_id": "1"},
+        "p3": {"split": "test", "fold_id": None},
+    }
+    result = assign_train_folds(rows, split)
+    assert [(r["peptide_id"], r["fold_id"]) for r in result] == [("p1", "0"), ("p2", "1")]
     assert "fold_id" not in rows[0]  # original dicts untouched
 
 
-def test_assign_fold_ids_raises_on_unmapped_sequence():
-    rows = [{"peptide_id": "p1", "sequence": "AAA"}, {"peptide_id": "p2", "sequence": "ZZZ"}]
-    fold_by_sequence = {"AAA": "0"}
+def test_assign_train_folds_same_sequence_different_folds_keep_their_own_fold():
+    # 'X' placeholder sequences are shared by different molecules; a
+    # sequence-keyed lookup would collapse these onto one fold.
+    rows = [{"peptide_id": "p1", "sequence": "AXA"}, {"peptide_id": "p2", "sequence": "AXA"}]
+    split = {"p1": {"split": "train", "fold_id": "0"}, "p2": {"split": "train", "fold_id": "4"}}
+    assert [r["fold_id"] for r in assign_train_folds(rows, split)] == ["0", "4"]
+
+
+def test_assign_train_folds_raises_on_unmapped_peptide_or_missing_fold():
     with pytest.raises(CrossValidationError, match="ZZZ"):
-        assign_fold_ids(rows, fold_by_sequence)
+        assign_train_folds([{"peptide_id": "ZZZ"}], {"p1": {"split": "train", "fold_id": "0"}})
+    with pytest.raises(CrossValidationError, match="no fold_id"):
+        assign_train_folds([{"peptide_id": "p1"}], {"p1": {"split": "train", "fold_id": None}})
 
 
 def _make_peptide_rows(n, seed=0, organism="Escherichia coli"):
@@ -113,6 +129,32 @@ def test_train_and_evaluate_fold_only_evaluates_requested_groups():
     assert set(metrics_by_group.keys()) == {"fit"}
     assert len(results_df) == 20
     assert set(results_df["eval_group"]) == {"fit"}
+
+
+def test_train_and_evaluate_fold_on_epoch_end_reports_finite_losses_per_epoch():
+    rows = _make_peptide_rows(40)
+    row_groups = {"fit": rows[:30], "val": rows[30:]}
+    history = []
+
+    train_and_evaluate_fold(
+        row_groups, epochs=3, seed=42, peptide_method="rdkit_descriptors",
+        organism_method="vocab_embedding", architecture="baseline_classifier",
+        device="cpu", on_epoch_end=history.append,
+    )
+    assert [h["epoch"] for h in history] == [1, 2, 3]
+    for h in history:
+        assert set(h) == {"epoch", "fit_loss", "val_loss", "val_auroc"}
+        assert np.isfinite([h["fit_loss"], h["val_loss"]]).all()
+
+
+def test_train_and_evaluate_fold_without_callback_does_not_need_a_val_group():
+    rows = _make_peptide_rows(20)
+    metrics_by_group, _ = train_and_evaluate_fold(
+        {"fit": rows}, eval_groups=("fit",), epochs=1, seed=42,
+        peptide_method="rdkit_descriptors", organism_method="vocab_embedding",
+        architecture="baseline_classifier", device="cpu",
+    )
+    assert set(metrics_by_group) == {"fit"}
 
 
 def test_train_and_evaluate_fold_forwards_peptide_and_organism_method_kwargs():

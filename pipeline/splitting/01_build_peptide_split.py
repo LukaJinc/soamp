@@ -66,11 +66,14 @@ def main() -> None:
         identity_gap_extension=CFG.qmap_graph.gap_extension,
         identity_use_cache=CFG.qmap_graph.use_cache,
         identity_num_threads=CFG.qmap_graph.num_threads,
+        hard_link_fingerprint_threshold=CFG.hard_links.fingerprint_threshold,
+        hard_link_identity_threshold=CFG.hard_links.identity_threshold,
         leiden_n_iterations=CFG.leiden.n_iterations,
         leiden_seed=CFG.leiden.seed,
         test_size=CFG.bucketing.test_size,
         n_folds=CFG.bucketing.n_folds,
         bucket_lambda_noncanonical=CFG.bucketing.lambda_noncanonical,
+        bucket_lambda_active=CFG.bucketing.lambda_active,
         bucket_n_iterations=CFG.bucketing.n_iterations,
         bucket_seed=CFG.bucketing.seed,
     )
@@ -88,7 +91,13 @@ def main() -> None:
     log.info(
         f"n_clusters={result.sidecar['n_clusters']} "
         f"largest_cluster_fraction={result.sidecar['largest_cluster_fraction']:.3f} "
-        f"dataset_has_noncanonical_fraction={result.sidecar['dataset_has_noncanonical_fraction']:.3f}"
+        f"dataset_has_noncanonical_fraction={result.sidecar['dataset_has_noncanonical_fraction']:.3f} "
+        f"balanced_over={result.sidecar['balanced_over']}"
+    )
+    log.info(
+        f"hard links: {result.sidecar['n_hard_links']} pairs -> "
+        f"{result.sidecar['n_hard_link_groups']} contracted nodes; "
+        f"cross-bucket edges: {result.sidecar['cross_bucket_edges']}"
     )
     for name, stats in result.sidecar["bucket_stats"].items():
         log.info(f"bucket {name}: {stats}")

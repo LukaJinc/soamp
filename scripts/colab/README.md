@@ -6,7 +6,7 @@ Three notebooks:
 |---|---|
 | `01_smoke_overfit.ipynb` | Builds all four (peptide × organism) featurizations, checks each produces the dimensions it claims and forwards through `attention_fusion_classifier`, then overfits ~256 rows per cell and asserts the loss reaches zero. Gate for notebooks 02 and 03. |
 | `02_run_experiments.ipynb` | Builds the PeptideCLM feature artifact on the GPU (cached to Drive), then runs the four `config/train/exp_*.yaml` cells through `pipeline/train.py` (single held-out train/val/test split) and collects results from wandb. |
-| `03_run_cv_experiments.ipynb` | CV counterpart to 02: builds/reuses the same PeptideCLM feature artifact, then runs the four `config/train/cv_*.yaml` cells through `pipeline/train_cv.py` (5-fold CV over `data/train_folds_leiden.csv`, train split only — no checkpoints, `test` never touched) and collects results from wandb. |
+| `03_run_cv_experiments.ipynb` | CV counterpart to 02: builds/reuses the same PeptideCLM feature artifact, then runs the four `config/train/cv_*.yaml` cells through `pipeline/train_cv.py` (5-fold CV over the train peptides of the committed `data/peptide_split.csv` — no checkpoints, `test` never touched; per-epoch fit/val loss curves are logged to wandb and plotted in the notebook) and collects results from wandb. |
 
 Run 01 first as a gate; 02 and 03 are independent of each other (each rebuilds/reuses its own PeptideCLM cache) and can run in either order.
 
@@ -49,9 +49,9 @@ All four land in wandb project `soamp`, group `featurization_grid_v1`.
 The CV counterpart (`03_run_cv_experiments.ipynb`, `config/train/cv_*.yaml`,
 `exp_id`s `{rdkit,peptideclm}_{vocab,kmer}_cv`) runs the same four cells
 through `pipeline/train_cv.py`'s 5-fold CV instead, logging to a separate
-group, `featurization_grid_cv_v1` — cross-fold `{fit,val}_<metric>_{mean,std}`
+group, `featurization_grid_cv_v2` — cross-fold `{fit,val}_<metric>_{mean,std}`
 summary keys, no `test_*` keys (CV never touches test) and no checkpoints
-(`pipeline/train_cv.py` never invokes a `Checkpointer`).
+(`pipeline/train_cv.py` never invokes a `Checkpointer`). `_v2` marks the new folds from `peptide_split.csv`; `_v1` runs used the old QMAP-only folds and aren't comparable.
 
 ## Feature artifacts
 
@@ -97,7 +97,7 @@ So the leanest workflow is often:
        python pipeline/train.py --config config/train/exp_${cell}.yaml
    done
    ```
-   And/or the CV counterpart (`data/train_folds_leiden.csv` is committed, so
+   And/or the CV counterpart (`data/peptide_split.csv` is committed, so
    no extra setup is needed):
    ```
    for cell in rdkit_vocab rdkit_kmer peptideclm_vocab peptideclm_kmer; do

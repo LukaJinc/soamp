@@ -20,8 +20,9 @@ def test_base_yaml_loads():
     assert cfg.leiden.seed == 42
     assert cfg.bucketing.test_size == 0.2
     assert cfg.bucketing.n_folds == 5
-    assert cfg.bucketing.lambda_noncanonical == 8.0
-    assert cfg.bucketing.n_iterations == 40_000
+    assert cfg.bucketing.lambda_noncanonical == 30.0
+    assert cfg.bucketing.lambda_active == 30.0
+    assert cfg.bucketing.n_iterations == 100_000
     assert cfg.bucketing.seed == 42
     assert cfg.output.filename == "peptide_split.csv"
     assert cfg.output.sidecar_filename == "peptide_split.json"

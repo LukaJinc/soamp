@@ -1,0 +1,5 @@
+,cluster_fingerprint,cluster_descriptor,cluster_peptideclm,cluster_qmap
+cluster_fingerprint,1.0,0.027096,0.047505,0.086035
+cluster_descriptor,0.027096,1.0,0.123858,0.049091
+cluster_peptideclm,0.047505,0.123858,1.0,0.048072
+cluster_qmap,0.086035,0.049091,0.048072,1.0

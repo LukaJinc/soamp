@@ -1,11 +1,16 @@
-"""K-fold cross-validation over the Leiden-community folds in
-data/train_folds_leiden.csv -- lifted out of scripts/EDA/build_dataset_build_model.ipynb
+"""K-fold cross-validation over the CV folds in data/peptide_split.csv
+(soamp.splitting) -- lifted out of scripts/EDA/build_dataset_build_model.ipynb
 (and its kfold_demo sibling) into tested, canonical library code, per the
 same "two cooks" reasoning as soamp.data.splitting's val-split extraction:
 the fold-evaluation loop existed only as copy-pasted notebook cells, and the
-two copies had already drifted -- one joins the fold file on the correct key
-(`sequence`), the other on an unrelated ID space (`node_id` vs `peptide_id`)
+two copies had already drifted -- one joined the old fold file on the
+correct key, the other on an unrelated ID space (`node_id` vs `peptide_id`)
 that only coincidentally overlaps in range, silently misassigning folds.
+
+Folds are keyed by `peptide_id` (peptide_split.csv's own key), never by
+`sequence`: sequences containing the 'X' placeholder are shared by different
+molecules that may legitimately land in different folds, so a sequence-keyed
+lookup would silently collapse them onto one arbitrary fold.
 
 No wandb/tracker coupling here (per CLAUDE.md sec 6) -- pipeline/train_cv.py
 owns the wandb.init/log/Artifact calls; everything in this module is plain
@@ -13,7 +18,7 @@ data in, data out, so it's testable without mocking a tracker.
 """
 import csv
 from pathlib import Path
-from typing import Literal
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -34,29 +39,42 @@ class CrossValidationError(ValueError):
     """Raised when a row's sequence has no fold assignment."""
 
 
-def load_fold_assignments(folds_csv_path: str | Path) -> dict[str, str]:
-    """Reads train_folds_leiden.csv, keyed by **sequence** -- the verified
-    join key (train_folds_leiden.csv's `node_id` is an igraph vertex index
-    assigned when the fold-generation notebook built its similarity graph;
-    it is not this dataset's `peptide_id`, and joining the two directly
-    silently misassigns folds since they're unrelated ID spaces that happen
-    to overlap in range). Values are the `fold_id` field as written in the
-    CSV (a string, e.g. "0".."4")."""
-    with open(folds_csv_path, newline="") as f:
-        return {row["sequence"]: row["fold_id"] for row in csv.DictReader(f)}
+def load_peptide_split(split_csv_path: str | Path) -> dict[str, dict]:
+    """Reads peptide_split.csv into {peptide_id: {"split": "train"|"test",
+    "fold_id": "0".."4" | None}} (fold_id is None for test peptides)."""
+    out: dict[str, dict] = {}
+    with open(split_csv_path, newline="") as f:
+        for row in csv.DictReader(f):
+            fold = row["fold_id"]
+            out[row["peptide_id"]] = {
+                "split": row["split"],
+                "fold_id": str(int(float(fold))) if fold not in ("", None) else None,
+            }
+    return out
 
 
-def assign_fold_ids(rows: list[dict], fold_by_sequence: dict[str, str]) -> list[dict]:
-    """Returns new row dicts with a `fold_id` key added, looked up by each
-    row's `sequence`. Raises CrossValidationError listing every row with no
-    fold assignment, rather than silently dropping or misassigning it."""
-    missing = sorted({r["sequence"] for r in rows if r["sequence"] not in fold_by_sequence})
+def assign_train_folds(rows: list[dict], peptide_split: dict[str, dict]) -> list[dict]:
+    """Returns new row dicts for the rows whose peptide is in the `train`
+    split of `peptide_split`, each with a `fold_id` key added (looked up by
+    `peptide_id`). `test` rows are dropped, never returned. Raises
+    CrossValidationError if any row's peptide_id is absent from
+    `peptide_split`, or a train peptide has no fold, rather than silently
+    dropping or misassigning it."""
+    missing = sorted({r["peptide_id"] for r in rows if r["peptide_id"] not in peptide_split})
     if missing:
         raise CrossValidationError(
-            f"{len(missing)} sequence(s) have no fold assignment in the folds CSV: "
+            f"{len(missing)} peptide_id(s) have no entry in the split file: "
             f"{missing[:5]}{'...' if len(missing) > 5 else ''}"
         )
-    return [{**row, "fold_id": fold_by_sequence[row["sequence"]]} for row in rows]
+    out = []
+    for row in rows:
+        entry = peptide_split[row["peptide_id"]]
+        if entry["split"] != "train":
+            continue
+        if entry["fold_id"] is None:
+            raise CrossValidationError(f"train peptide {row['peptide_id']!r} has no fold_id")
+        out.append({**row, "fold_id": entry["fold_id"]})
+    return out
 
 
 def train_and_evaluate_fold(
@@ -77,6 +95,7 @@ def train_and_evaluate_fold(
     class_balancing_fixed_pos_weight: float | None = None,
     device: "torch.device | str | None" = None,
     watch: bool = False,
+    on_epoch_end: Callable[[dict], None] | None = None,
 ) -> tuple[dict[str, dict], pd.DataFrame]:
     """One fold: build_dataset(row_groups=...) -> build_model -> train for
     `epochs` -> evaluate on every eval_groups member. Reproduces
@@ -92,6 +111,13 @@ def train_and_evaluate_fold(
     passed via peptide_method_kwargs={"cache": ...} makes embeddings
     computed in an earlier fold get reused rather than recomputed; see
     soamp.features.peptide_featurizers.PeptideCLMFeaturizer's docstring).
+
+    `on_epoch_end`, if given, is called after every epoch with
+    {"epoch": 1-based epoch, "fit_loss": mean training loss of that epoch,
+    "val_loss": loss on the `val` group, "val_auroc": its AUROC} -- this is
+    how callers get loss curves without this module knowing about any
+    tracker. Requires a "val" key in `row_groups`; adds one no-grad pass over
+    that group per epoch, and nothing at all when left None.
 
     Returns (metrics_by_group, results_df): metrics_by_group maps each
     eval_groups member to a compute_binary_metrics() dict; results_df is
@@ -145,8 +171,20 @@ def train_and_evaluate_fold(
         # forward/backward passes below, not a throwaway preview model.
         watch_model(model)
 
-    for _ in range(epochs):
-        trainer.train_epoch(fit_loader)
+    val_loader = (
+        DataLoader(bundle.datasets["val"], batch_size=batch_size)
+        if on_epoch_end is not None else None
+    )
+    for epoch in range(1, epochs + 1):
+        fit_loss = trainer.train_epoch(fit_loader)["loss"]
+        if on_epoch_end is not None:
+            val_out = trainer.evaluate(val_loader)
+            on_epoch_end({
+                "epoch": epoch,
+                "fit_loss": fit_loss,
+                "val_loss": val_out["loss"],
+                "val_auroc": compute_binary_metrics(val_out["logits"], val_out["labels"])["auroc"],
+            })
 
     # Each eval_loader has shuffle=False, so its eval_out arrays line up 1:1
     # with row_groups[group] in order -- safe to reconstruct a per-row table.

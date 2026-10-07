@@ -103,7 +103,7 @@ def test_wandb_group_and_tags_default_to_unset():
 
 def test_cv_folds_csv_filename_defaults():
     cfg = load_config("config/train/base.yaml", TrainConfig)
-    assert cfg.cv.folds_csv_filename == "train_folds_leiden.csv"
+    assert cfg.cv.folds_csv_filename == "peptide_split.csv"
 
 
 @pytest.mark.parametrize(

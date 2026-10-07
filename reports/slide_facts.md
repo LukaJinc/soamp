@@ -1,0 +1,867 @@
+# SOAMP slide facts
+
+Read-only fact extraction from existing artifacts. No model was retrained, no data
+patched. Every number below cites the file or artifact it came from. Anything not on
+disk is marked **NOT AVAILABLE**.
+
+Generated: 2026-09-24.
+
+---
+
+## 0. Snapshot and split version being read
+
+| Artifact | File | Notes |
+|---|---|---|
+| Curated regression dataset | `data/final_mic_regression_dataset.csv` (mtime 2026-08-15) | 72,587 rows, 15,904 peptides, 499 organisms |
+| Binary labels | `data/mic_activity_labels.csv` (2026-08-15) | 72,587 rows |
+| Model-ready classification set | `data/mic_classification_dataset.csv` (2026-09-13) | 24,630 rows, 12,371 peptides, 3 organisms |
+| Splits — **five distinct artifacts exist**, see below | | |
+
+### The split-assignment gap is FIXED
+
+The ~1,400-peptide gap is resolved and independently re-verified.
+
+- Root cause (`reports/qa_followup.md`, Issue 1): `qmap.toolkit.train_test_split`
+  defaults to `post_filtering=True`, whose leakage filter *silently dropped* 1,414
+  train peptides from the returned lists. It was **not** a pre-recovery snapshot —
+  `qa_followup.md` states the final CSV and split were computed in one continuous run.
+- Fix: those 1,414 were reassigned to **test** (they were flagged as too similar to a
+  test peptide, so they cannot safely go to train).
+- Verification (`reports/qa_report.md` §5, status **PASS**): `n_train=11114`,
+  `n_test=4790`, `n_overlap=0`, `n_orphan_final_not_split=0`,
+  `n_orphan_split_not_final=0`, `n_row_level_inconsistent=0`. 11,114 + 4,790 = 15,904
+  = every unique peptide (`reports/step6_final_split_log.txt`).
+
+So a single set of numbers is reported throughout; no "with/without split assignment"
+split is needed.
+
+### The five split artifacts (this matters for Sections C and E)
+
+| # | Artifact | Method | Used by |
+|---|---|---|---|
+| 1 | `data/split_indices.json` | QMAP Leiden, 60% identity, `test_size=0.2`, seed 42, + 1,414 leakage reassignment | the `split` column of `mic_classification_dataset.csv` → **every completed training run** |
+| 2 | `data/val_split.json` | fit/val carve-out of #1's train, same homology-aware mechanism, `val_fraction=0.3` | `pipeline/train.py` (all 5 single-split runs) |
+| 3 | `data/train_folds_leiden.csv` | sequence-identity graph + Leiden, greedy binning into 5 folds | `pipeline/train_cv.py` (both CV runs) |
+| 4 | `data/clustering/consensus_split.csv` | EDA 4-voter consensus (notebooks 01–05) | **no run** — exploratory only |
+| 5 | `data/peptide_split.csv` (2026-09-24) | `pipeline/splitting/01_build_peptide_split.py`: union graph (Morgan Tanimoto ≥ 0.8 **OR** QMAP identity ≥ 0.6) → Leiden → stratified whole-cluster bucketing | **no run yet** |
+
+**Every result in Section E was produced on splits #1–#3, not on #5.**
+
+---
+
+## SECTION A — Task definition
+
+### A1. Prediction target
+
+**Binary active / inactive classification.** (A regression-labelled dataset exists
+upstream, but no regression model is trained — `src/soamp/engine/metrics.py` implements
+only binary metrics; the loss is `BCEWithLogitsLoss`, `pipeline/train.py`.)
+
+Thresholds: a **dual breakpoint per organism**, hand-curated, in
+`config/thresholds/organism_thresholds.csv` (the `thresholds:organism_specific`
+artifact). Semantics (`config/thresholds/README.md`):
+
+- MIC ≤ `active_threshold_uM` → `active`
+- MIC ≥ `inactive_threshold_uM` → `inactive`
+- strictly between → `uncertain` (an intentional gray zone, CLSI/EUCAST-shaped)
+- no breakpoint filled in → `unlabeled`
+
+Filled-in values (`config/thresholds/organism_thresholds.csv`, 658 rows total —
+499 species + 159 genus):
+
+| match_key | level | NCBI taxon | n_dataset_rows | active_uM | inactive_uM | source |
+|---|---|---|---|---|---|---|
+| Escherichia coli | species | 562 | 12,856 | 32 | 128 | user-specified 2026-08-15 |
+| Staphylococcus aureus | species | 1280 | 12,047 | 32 | 128 | user-specified 2026-08-15 |
+| Pseudomonas aeruginosa | species | 287 | 8,937 | 32 | 128 | user-specified 2026-08-15 |
+
+**3 of 658 rows are filled in.** The other 655 are blank.
+
+Lookup precedence: species-exact → genus fallback (first word) → unmatched
+(`src/soamp/common/thresholds.py::lookup_threshold`).
+
+Versioning: hand-edited CSV + `config/thresholds/CHANGELOG.md`, semver-style
+(`v0.1.0` 2026-08-14 → `v0.1.1` schema change to the dual breakpoint → `v0.1.2`
+2026-08-15, the 3 fills). Not tracked as a wandb artifact; the CV notebook logs a
+copy under the name `organism_activity_thresholds` (`pipeline/train_cv.py`).
+
+### A2. Exact model inputs
+
+**Peptide input.** The featurizer consumes the `smiles` column — a
+RDKit-canonical SMILES string, **never the `sequence` column**
+(`src/soamp/features/peptide.py`; rationale recorded in `CLAUDE.md`: no ready-made
+net-charge/hydrophobicity function covers the ~20% non-canonical/cyclic peptides).
+SMILES provenance (`reports/step4_recovery_log.txt`, `reports/qa_report.md` §2):
+
+- native DBAASP SMILES where available (2,853 of 2,870 recovered peptides)
+- else generated by `p2smi` — linear (11), disulfide `SS` (3), head-to-tail `HT` (3)
+- D-residues are lowercase in DBAASP's `sequence` encoding and are carried as explicit
+  stereochemistry in the SMILES; cyclisation appears as an explicit ring closure
+  (e.g. `CSSC` for a disulfide)
+- 15,904 / 15,904 unique SMILES parse in RDKit, 0 MW mismatches, 0 round-trip
+  instability (`reports/qa_report.md` §2)
+
+**Organism input.** The raw `organism` column is a species name string. Two encodings
+are implemented (`src/soamp/features/organism_featurizers.py`) — see D2.
+
+**Three real rows** (from `data/mic_classification_dataset.csv`):
+
+| peptide_id | sequence | bond_type | non-canonical | organism | MIC (µM) | mic_type | label | split |
+|---|---|---|---|---|---|---|---|---|
+| 10 | `LFIFFF` | none (linear) | False | *S. aureus* | 15.6 | censored | active | train |
+| 15 | `DSHAKRHHGYKRKFHEKHHSHRGY` | none (linear) | False | *S. aureus* | 132.0 | censored | inactive | train |
+| 57 | `VTCDILSVEAKGVKLNDAACAAHCLFRGRSGGYCNGKRVCVCR` | **DSB (disulfide, non-linear)** | False | *S. aureus* | 2.36 | averaged | active | train |
+
+SMILES for each (truncated; full strings in the CSV):
+
+- 10: `CC[C@H](C)[C@H](NC(=O)[C@H](Cc1ccccc1)NC(=O)[C@@H](N)CC(C)C)C(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H](C...` (135 chars)
+- 15: `C[C@H](NC(=O)[C@H](Cc1cnc[nH]1)NC(=O)[C@H](CO)NC(=O)[C@@H](N)CC(=O)O)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CCCN=C(N)N)C(=O)N[C...` (500 chars)
+- 57: `CC[C@H](C)[C@@H]1NC(=O)[C@H](CC(=O)O)NC(=O)[C@@H](NC(=O)[C@@H](NC(=O)[C@@H](N)C(C)C)[C@@H](C)O)CSSC[C@@H]2NC(=O)[C@H](Cc...` (744 chars — note the `CSSC` disulfide bridge)
+
+---
+
+## SECTION B — Dataset
+
+### B1. Curation funnel
+
+Sources: `reports/step3_diff_log.txt`, `step4_recovery_log.txt`, `step5_assay_unit_log.txt`,
+`step6_final_split_log.txt`, `reports/qa_report.md`; organism counts computed from the
+CSVs named.
+
+| Step | Artifact | Peptides | (peptide, organism) records | Distinct organisms |
+|---|---|---|---|---|
+| DBAASP raw crawl | `data/dbaasp_raw_full.csv` | 24,444 | — (not yet flattened) | — |
+| QMAP published baseline | `data/qmap_included.csv` | 18,033 (13,761 with ≥1 usable target) | 62,729 | 492 |
+| + recovery pass | `data/recovered_peptides.csv` | +2,870 recovered | — | — |
+| Assay filter + unit standardisation | `data/step5_standardized_mic.csv` | 15,904 | 72,587 | 499 |
+| **Final** | `data/final_mic_regression_dataset.csv` | **15,904** | **72,587** | **499** |
+| — of which QMAP-sourced | | 13,680 | 62,331 | 476 |
+| — of which recovered | | 2,224 | 10,256 | 195 |
+
+**Drops at the QMAP-exclusion diff** (`step3_diff_log.txt`; 24,444 raw − 18,033 in QMAP = 6,411 excluded):
+
+| Bucket | Reason | Peptides |
+|---|---|---|
+| b1 | non-monomer (out of scope, never attempted) | 664 |
+| b2 | unsupported N-/C-terminal modification (lipidation, PEGylation, …) | 2,565 |
+| b3 | unresolved residue, no SMILES available | 1,428 |
+| b4 | non-standard bond type (thioether, lactam, lactone, …) | 135 |
+| b5 | excluded, unexplained (temporal drift vs QMAP's snapshot) | 1,619 |
+| c | in QMAP but absent from this crawl | **0** |
+
+**Recovery yield** (`step4_recovery_log.txt`): 2,870 recovered of 5,747 attempted
+(b2–b5); 3,541 logged unconvertible in `data/unconvertible_peptides.csv`.
+
+| Bucket | Recovered / attempted |
+|---|---|
+| b2 terminus_based | 1,230 / 2,565 |
+| b3 residue_based | 17 / 1,428 |
+| b4 bond_based | 6 / 135 |
+| b5 unexplained_temporal_drift | 1,617 / 1,619 |
+
+**Drops at assay filtering + unit standardisation** (`step5_assay_unit_log.txt`;
+20,903 peptides considered, 163,653 raw `targetActivity` records examined):
+
+| Reason | Records dropped |
+|---|---|
+| assay type ≠ MIC (MBC 12,763; None 10,082; IC50 8,290; …) | 47,604 |
+| non-bacterial target domain (Fungus 11,612; Other 97; Unknown 56; Animal 1) | 11,766 |
+| unsupported/missing unit | 23 |
+| MW unavailable at µg/mL → µM conversion | 627 |
+| unparseable/missing concentration string | 4 |
+| **Kept raw measurements** | **103,629** |
+
+Also: 114 peptides dropped entirely because no SMILES could be resolved; 0 where SMILES
+resolved but RDKit MW failed. 103,629 raw measurements collapse to 72,587
+(peptide, organism) groups; 15,456 groups average >1 measurement; IQR outlier removal
+touched 2,236 groups / 4,062 points.
+
+**Labelling** (`reports/labeling_step2_binarize_log.txt`), applied to all 72,587 rows:
+
+| Label | Rows |
+|---|---|
+| active | 20,736 |
+| inactive | 3,894 |
+| uncertain (in the gray zone) | 9,210 |
+| **unlabeled (no threshold for that organism)** | **38,747 (53.4%)** |
+
+Threshold coverage: 33,840 / 72,587 = **46.6%**, all via species-level match
+(genus: 0).
+
+**Model-ready assembly** (`reports/data_step1_build_classification_dataset_log.txt`):
+filter to `label ∈ {active, inactive}` → **24,630 rows, 12,371 peptides, 3 organisms**.
+
+### B2. Final dataset characteristics
+
+Two scopes matter; both are reported.
+
+| | Curated regression set | Model-ready classification set |
+|---|---|---|
+| File | `final_mic_regression_dataset.csv` | `mic_classification_dataset.csv` |
+| Unique peptides | 15,904 | 12,371 |
+| Unique organisms | 499 | 3 |
+| (peptide, organism) pairs | 72,587 | 24,630 |
+| Linear peptides | 13,161 (82.8%) | 10,310 (83.3%) |
+| Non-linear peptides | 2,743 (17.2%) | 2,061 (16.7%) |
+| `has_noncanonical` = True | 3,063 (19.3%) | 2,482 (20.1%) |
+
+**Definition of "non-linear" as used in code**: `is_linear = (bond_type == "none")`
+(`scripts/EDA/README_clustering.md`, notebooks 01–03 setup cells; the `is_linear`
+column of `data/clustering/peptide_voters.parquet`). Any annotated inter-residue bond
+counts as non-linear. This is a *different* flag from `has_noncanonical` (non-standard
+residues / D-forms / terminal modifications), and the two do not coincide.
+
+`bond_type` breakdown over 15,904 unique peptides (`final_mic_regression_dataset.csv`):
+`none` 13,161 · `DSB` 1,703 · `AMD` 881 · `AMD|DSB` 94 · `EST` 53 · `AMN|TIE` 6 ·
+`ETH` 3 · `CAR` 1 · `AMD|AMN|DSB` 1 · `AMD|AMN` 1.
+
+**Peptide length** (residues, from `sequence`, 15,904 unique peptides):
+
+| | min | median | max | mean |
+|---|---|---|---|---|
+| all | 1 | 15 | 190 | 17.50 |
+| linear (n=13,161) | 1 | 15 | 190 | 16.70 |
+| non-linear (n=2,743) | 1 | 18 | 107 | 21.31 |
+
+**Label distribution (classification target)** — `mic_classification_dataset.csv`:
+active 20,736 / inactive 3,894 → **84.2% positive**. Per organism:
+
+| organism | active | inactive | % active |
+|---|---|---|---|
+| Escherichia coli | 8,288 | 1,359 | 85.9 |
+| Staphylococcus aureus | 7,299 | 1,449 | 83.4 |
+| Pseudomonas aeruginosa | 5,149 | 1,086 | 82.6 |
+
+**MIC distribution (log₁₀ µM, 72,587 rows)**:
+
+| quantile | 0 | 1% | 5% | 25% | 50% | 75% | 95% | 99% | 100% |
+|---|---|---|---|---|---|---|---|---|---|
+| log₁₀ MIC (µM) | −4.842 | −0.767 | −0.087 | 0.602 | **1.179** | 1.732 | 2.301 | 3.042 | 4.837 |
+
+`mic_type`: exact 38,808 · censored 18,323 · averaged 15,456.
+All 18,323 censored rows recovered a censoring direction
+(`reports/qa_report.md` §7: 18,323/18,323).
+
+### B3. Organism coverage
+
+Top 15 by record count (`final_mic_regression_dataset.csv`):
+
+| # | organism | records | thresholded? |
+|---|---|---|---|
+| 1 | Escherichia coli | 12,856 | **yes** |
+| 2 | Staphylococcus aureus | 12,047 | **yes** |
+| 3 | Pseudomonas aeruginosa | 8,937 | **yes** |
+| 4 | Bacillus subtilis | 3,888 | no |
+| 5 | Klebsiella pneumoniae | 3,780 | no |
+| 6 | Staphylococcus epidermidis | 3,133 | no |
+| 7 | Acinetobacter baumannii | 3,098 | no |
+| 8 | Enterococcus faecalis | 2,497 | no |
+| 9 | Salmonella enterica | 2,193 | no |
+| 10 | Micrococcus luteus | 1,338 | no |
+| 11 | Enterococcus faecium | 1,117 | no |
+| 12 | Salmonella typhimurium | 1,013 | no |
+| 13 | Bacillus cereus | 814 | no |
+| 14 | Listeria monocytogenes | 759 | no |
+| 15 | Enterobacter cloacae | 618 | no |
+
+- Organisms with **fewer than 20 records: 333 of 499 (66.7%)**.
+- Measurements per peptide: **median 4, max 32**, mean 4.56.
+- Peptides tested against **more than one organism: 14,073 of 15,904 (88.5%)**.
+
+### B4. Figures
+
+- `reports/slide_figs/b4_1_mic_distribution.png` — log₁₀ MIC histogram over all 72,587
+  records, with the 32 µM / 128 µM breakpoints marked.
+- `reports/slide_figs/b4_2_records_per_organism_top30.png` — top 30 organisms, log-scale
+  bar, value-labelled.
+- `reports/slide_figs/b4_3_peptide_length_by_linearity.png` — length histogram split by
+  linear / non-linear.
+
+---
+
+## SECTION C — Clustering and splitting
+
+### C1. The four voters
+
+All four run over the **12,371-peptide model-ready set**
+(`data/clustering/peptide_voters.parquet`). Parameters from the notebooks' named
+constants; cluster statistics from their stored outputs.
+
+| | (a) Morgan/Butina | (b) RDKit descriptors | (c) PeptideCLM | (d) QMAP/Leiden |
+|---|---|---|---|---|
+| Notebook | `01_fingerprint_and_descriptor_clustering.ipynb` | same | `02_peptideclm_clustering.ipynb` | `03_qmap_sequence_clustering.ipynb` |
+| Column | `cluster_fingerprint` | `cluster_descriptor` | `cluster_peptideclm` | `cluster_qmap` |
+| Representation | Morgan/ECFP, **radius 2** (ECFP4-equiv.), **2048 bits** | the 13 RDKit descriptors (same list as `features_peptide`), **standardized** | `aaronfeller/PeptideCLM-23M-all`, 768-dim mean-pooled last hidden state | sequence-identity graph, **BLOSUM45**, gap_open **5**, gap_extend **1**, identity ≥ **0.60** |
+| Algorithm | Butina, **Tanimoto distance cutoff 0.35** (= similarity ≥ 0.65) | k-means, k chosen by silhouette | k-means, k chosen by silhouette | Leiden, `n_iterations=-1`, seed 42 |
+| k / clusters | **611** | **5** (silhouette 0.3407 at k=5) | **5** (silhouette 0.1080 at k=5) | **1,504** |
+| Size min / median / max | 1 / 2 / 1,993 | 92 / 2,528 / 4,604 | 977 / 2,310 / 3,952 | 1 / 1 / 791 |
+| Largest cluster | 16.1% | 37.2% | 31.9% | 7.3% |
+| Coverage | 12,371 / 12,371 (100%) | 100% | 100% | **10,888 / 12,371 (88.0%)** |
+| Runtime | 19.0 s | 0.01 s | 251 s (4.2 min embedding) | 2.0 s |
+
+Singleton counts for (b) and (c) are 0 by construction (k=5 k-means). For (a) and (d)
+the medians of 2 and 1 respectively imply a heavily singleton-dominated tail; the exact
+singleton count was not printed in the notebooks and is **NOT AVAILABLE** without
+re-running them (the per-peptide cluster columns are persisted, so it is recomputable,
+but no stored number exists).
+
+**Voter (d)'s coverage gap** (`03_qmap_sequence_clustering.ipynb`, cell 9 — the only
+voter below 100%): **1,483 peptides** carry DBAASP's unresolved-residue placeholder
+`X`/`x` in `sequence`, so no valid sequence representation exists; they get a null
+vote, never a guessed cluster.
+
+| | linear | non-linear | total |
+|---|---|---|---|
+| scoreable | 9,217 | 1,671 | 10,888 |
+| unscoreable (X/x placeholder) | 1,093 | 390 | 1,483 |
+| total | 10,310 | 2,061 | 12,371 |
+
+Of 2,482 non-canonical peptides, 999 are scoreable via case-fold linearization
+(D-forms are lowercase); 1,483 are not. Graph built: 10,888 nodes, 185,021 edges.
+
+### C2. The two consensus strategies
+
+Both are computed from the same pairwise co-association matrix over all four voters
+(for each pair, the fraction of methods that agree, among methods that scored both).
+`04_consensus_comparison_and_split.ipynb`.
+
+| | 4a. Co-association + hierarchical | 4b. Vote-graph + Leiden |
+|---|---|---|
+| Mechanism | average-linkage agglomerative on `1 − co-association` | `leidenalg` on the co-association-weighted graph |
+| Key parameter | `N_CONSENSUS_CLUSTERS = 40` | `MIN_EDGE_WEIGHT = 0.7`, `LEIDEN_SEED = 42` |
+| Clusters | **40** | **556** |
+| Size range (median) | 1 – 1,784 (median 72) | 1 – 1,530 (median 1) |
+| Largest cluster | 1,784 peptides (**14.4%** of 12,371) | 1,530 peptides (**12.4%**) |
+| 5 largest | 1,784 / 1,755 / 1,692 / 1,007 / 970 | 1,530 / 1,163 / 1,131 / 1,103 / 910 |
+
+Vote graph: 1,102,224 edges of 76,514,635 possible pairs (1.4%) after ≥ 0.7 thresholding.
+**ARI between the two consensus partitions: 0.462.** 4,610 / 12,371 peptides (37.3%)
+land in a different group depending on which strategy is used.
+
+### C3. Which consensus produced the final split actually used?
+
+**Neither — for any trained run.** This needs stating precisely:
+
+1. The consensus work (`CHOSEN_CONSENSUS = "consensus_coassoc"`, 40 clusters →
+   `data/clustering/consensus_split.csv`, 2,700 test peptides / 21.8%) is **exploratory
+   notebook output**. No training run reads it.
+2. The **productionised** split, `data/peptide_split.csv`
+   (`pipeline/splitting/01_build_peptide_split.py`, built 2026-09-24), does **not** use
+   the 4-voter consensus at all. Its method string
+   (`data/peptide_split.json`) is: *union graph (Morgan/ECFP Tanimoto ≥ 0.8 **OR** QMAP
+   BLOSUM45 identity ≥ 0.6, both computed once and unioned) → `qmap.toolkit`
+   Leiden → stratified whole-cluster bucket assignment.* Parameters:
+   `fingerprint_threshold 0.8`, `radius 2`, `n_bits 2048`, `identity_threshold 0.6`,
+   `blosum45`, gap 5/1, `leiden_n_iterations 2`, `leiden_seed 42`, `test_size 0.2`,
+   `n_folds 5`, `lambda_noncanonical 8.0`, `n_iterations 40000`, `bucket_seed 42`
+   (`config/splitting/base.yaml`). Result: **673 clusters**, largest 9.30% of peptides,
+   1,483 QMAP-unscoreable peptides still covered (via the fingerprint half of the union).
+   **No training run has used it yet.**
+3. Every completed run used split #1/#2/#3 from §0 — QMAP sequence identity alone.
+
+**Split version id**: none of these artifacts carries a semantic version string.
+The only identifiers available are file path + mtime + the parameter block embedded in
+`data/peptide_split.json` / `data/val_split.json`. A `split_version` field is
+**NOT AVAILABLE**.
+
+### C4. Split sizes
+
+**(i) `data/peptide_split.csv` — the current pipeline split (not yet used for training).**
+Pairs/labels obtained by joining onto `mic_classification_dataset.csv`.
+
+| bucket | peptides | pairs | clusters | linear | non-linear | active | inactive | % active |
+|---|---|---|---|---|---|---|---|---|
+| test | 2,473 | 4,734 | 113 | 2,312 | 161 | 3,849 | 885 | 81.3 |
+| fold_0 | 1,978 | 3,877 | 112 | 1,717 | 261 | 3,026 | 851 | 78.1 |
+| fold_1 | 1,979 | 4,042 | 113 | 1,464 | 515 | 3,475 | 567 | 86.0 |
+| fold_2 | 1,978 | 4,046 | 112 | 1,459 | 519 | 3,350 | 696 | 82.8 |
+| fold_3 | 1,978 | 4,023 | 112 | 1,606 | 372 | 3,619 | 404 | 90.0 |
+| fold_4 | 1,985 | 3,908 | 111 | 1,752 | 233 | 3,417 | 491 | 87.4 |
+
+Total 673 clusters; sizes min 1 / median 1 / max 1,150; **477 singletons**.
+`has_noncanonical` fraction is balanced to the dataset rate 0.2006 by the bucketing
+objective — realised 0.2002 (test) and 0.2002–0.2025 across folds (`data/peptide_split.json`).
+Note the *linear/non-linear* balance is **not** targeted and is visibly uneven
+(non-linear peptides: 6.5% in test vs 26.2% in fold_2).
+
+Explicit confirmations, computed from `data/peptide_split.csv`:
+
+- **(a) no cluster spans train and test — CONFIRMED, 0 clusters.**
+- **(b) no cluster spans CV folds — CONFIRMED, 0 of 560 train clusters.**
+- **(c) no peptide in both train and test — CONFIRMED, 0 peptides.** (Splitting is done
+  at peptide level before the organism join, so a peptide cannot appear on both sides
+  under a different organism.)
+
+**(ii) The split every completed run actually used** (`split` column +
+`data/val_split.json`). Reproduces `reports/data_step2_split_train_validation_log.txt`
+exactly.
+
+| bucket | peptides | pairs | linear | non-linear | active | inactive | % active |
+|---|---|---|---|---|---|---|---|
+| fit | 5,743 | 11,308 | 4,684 | 1,059 | 9,543 | 1,765 | 84.4 |
+| val | 2,840 | 5,735 | 2,293 | 547 | 4,969 | 766 | 86.6 |
+| test | 3,788 | 7,587 | 3,333 | 455 | 6,224 | 1,363 | 82.0 |
+
+fit∩val = 0, train∩test = 0. **Cluster ids were not persisted for this split**, so
+(a)/(b) cannot be re-verified from disk for it — **NOT AVAILABLE** (the clustering ran
+inside `qmap.toolkit.train_test_split` and only the id lists were written out).
+
+**(iii) CV folds actually used by `pipeline/train_cv.py`** —
+`data/train_folds_leiden.csv` (7,891 sequences, 1,324 communities, sizes 1/1/463,
+909 singletons; joined on `sequence`, not `peptide_id`):
+
+| fold | 0 | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|---|
+| sequences | 1,529 | 1,628 | 1,536 | 1,608 | 1,590 |
+
+**(b) confirmed: 0 communities span more than one fold.**
+
+**(iv) EDA consensus split** (`data/clustering/consensus_split.csv`) — for completeness:
+
+| bucket | peptides | pairs | clusters | linear | non-linear | active | inactive | % active |
+|---|---|---|---|---|---|---|---|---|
+| test | 2,700 | 5,366 | 12 | 2,202 | 498 | 4,104 | 1,262 | 76.5 |
+| fold_0 | 498 | 1,015 | 4 | 275 | 223 | 928 | 87 | 91.4 |
+| fold_1 | 2,109 | 4,395 | 7 | 1,778 | 331 | 3,841 | 554 | 87.4 |
+| fold_2 | 3,218 | 6,463 | 3 | 3,068 | 150 | 5,561 | 902 | 86.0 |
+| fold_3 | 1,712 | 3,376 | 3 | 1,588 | 124 | 2,634 | 742 | 78.0 |
+| fold_4 | 2,134 | 4,015 | 11 | 1,399 | 735 | 3,668 | 347 | 91.4 |
+
+(a) 0 clusters span train/test; (b) 0 of 28 train clusters span folds; (c) 0 overlap.
+Fold sizes are badly imbalanced (498 vs 3,218) and fold_0 is 44.8% non-linear vs a
+~17% dataset rate — this is the documented reason it was not productionised.
+
+### C5. Existing diagnostics
+
+**Pairwise adjusted Rand index between the four voters.** Recomputed here from
+`data/clustering/peptide_voters.parquet` (the notebook rendered it as a pandas Styler,
+so no text value was stored). Each pair restricted to peptides both methods scored —
+only pairs involving `cluster_qmap` are affected (10,888 peptides).
+
+| | Morgan/Butina | RDKit desc. | PeptideCLM | QMAP/Leiden |
+|---|---|---|---|---|
+| **Morgan/Butina** | 1.000 | 0.027 | 0.048 | 0.086 |
+| **RDKit desc.** | 0.027 | 1.000 | 0.124 | 0.049 |
+| **PeptideCLM** | 0.048 | 0.124 | 1.000 | 0.048 |
+| **QMAP/Leiden** | 0.086 | 0.049 | 0.048 | 1.000 |
+
+**All pairwise ARI ≤ 0.124.** The four voters agree almost not at all — which is why
+their consensus is dominated by whichever voter has the finest granularity, and is a
+headline caveat, not a footnote. (For contrast, the two *consensus* partitions agree at
+ARI 0.462.) Saved: `reports/slide_figs/_ari_matrix.csv`.
+
+**Tanimoto k-NN leakage check** (`05_diagnostics.ipynb`, section 4): for each peptide,
+its k=10 nearest neighbours under Tanimoto (Morgan/ECFP) vote on a majority consensus
+cluster. **4,107 / 12,371 peptides (33.2%)** sit in a different `consensus_coassoc`
+cluster than their 10-NN majority. Computed in 22.7 s.
+
+### C6. Max-Tanimoto test→train similarity — cluster split vs random split
+
+Computed here (CPU, RDKit Morgan radius 2 / 2048 bits recomputed in 4.4 s; all 12,371
+SMILES parsed, 0 failures). For every test peptide, the maximum Tanimoto similarity to
+**any** train peptide. Random split: peptide-level 80/20, `numpy.default_rng(42)`.
+
+| split | n test | median | 90th pct | frac ≥ 0.7 | frac ≥ 0.9 | mean |
+|---|---|---|---|---|---|---|
+| **pipeline cluster split** (`peptide_split.csv`) | 2,473 | **0.782** | 0.869 | 0.896 | **0.035** | 0.779 |
+| QMAP split (the one runs used) | 3,788 | 0.855 | 1.000 | 0.945 | 0.340 | 0.856 |
+| EDA consensus split | 2,700 | 0.881 | 1.000 | 0.917 | 0.411 | 0.860 |
+| **plain random 80/20, seed 42** | 2,474 | **0.960** | 1.000 | 0.987 | **0.732** | 0.935 |
+
+**This is the "why random splits mislead" evidence.** Under a random split, **73.2% of
+test peptides have a near-duplicate (Tanimoto ≥ 0.9) in train** and the median test
+peptide is at 0.96 similarity — the test set is largely a paraphrase of the training
+set. The pipeline cluster split cuts that to **3.5%** and a median of 0.78. Note the
+QMAP split that all reported results were produced on sits in between, at 34.0% — so
+those numbers are **not** free of this effect either.
+
+Figure: `reports/slide_figs/c6_tanimoto_leakage_cluster_vs_random.png`
+(raw arrays: `reports/slide_figs/_maxsim.npz`, summary `_maxsim_summary.json`).
+
+### C7. Figures
+
+- `reports/slide_figs/c7_umap_by_split.png` — UMAP of the cached 768-dim PeptideCLM
+  embeddings (`data/clustering/peptideclm_embeddings.npy`, 12,371 × 768),
+  `n_neighbors=15, min_dist=0.1, metric=euclidean, random_state=42`, coloured
+  train / test under `data/peptide_split.csv`.
+- `reports/slide_figs/c7_umap_by_linearity.png` — same embedding, coloured
+  linear / non-linear.
+- `reports/slide_figs/c7_voter_ari_heatmap.png` — the C5 ARI matrix.
+
+### C8. Evidence of leakage inflating metrics (random vs cluster split, same model)
+
+**NOT AVAILABLE.** No model has been trained or evaluated on a random split, and none
+has been evaluated on `data/peptide_split.csv`. The five completed runs all use the
+QMAP split. A like-for-like comparison would require new training, which is out of
+scope here. C6 gives the *structural* evidence (similarity distributions) without it.
+
+---
+
+## SECTION D — Representations
+
+### D1. Peptide representations
+
+| | RDKit physicochemical descriptors | PeptideCLM SMILES tokens | Molecular graph (GNN) |
+|---|---|---|---|
+| Status | **implemented** | **implemented** | **not started** |
+| Registry name | `rdkit_descriptors` | `peptideclm_embedding` | — |
+| Output dim | **13** | **768** | — |
+| Code | `src/soamp/features/peptide.py` | `src/soamp/features/peptide_featurizers.py::PeptideCLMFeaturizer` | — |
+| Artifact | `data/peptide_features_rdkit.csv` (12,371 × 14) | `data/peptide_features_peptideclm.csv` (12,371 × 769, ~190 MB, gitignored) | — |
+| Details | `MolWt, TPSA, MolLogP, NumHDonors, NumHAcceptors, NumRotatableBonds, FractionCSP3, RingCount, NumAromaticRings, HeavyAtomCount, NumHeteroatoms, LabuteASA, FormalCharge` | checkpoint `aaronfeller/PeptideCLM-23M-all`, **frozen**, mean-pooled last hidden state, `max_length=512`, `batch_size=16`; vendored tokenizer in `src/soamp/features/peptideclm/` | — |
+| Column names | descriptor names | `dim_0 … dim_767` | — |
+
+There is **no GNN / molecular-graph featurizer** in the repo:
+`build_peptide_featurizer` accepts exactly two methods
+(`src/soamp/features/peptide_featurizers.py:158-163`), and a repo-wide grep for
+`torch_geometric` / `gnn` / `graph_neural` returns nothing.
+
+**Failures / NaN rates on non-linear peptides: zero for both.**
+Checked directly on the artifacts: `peptide_features_rdkit.csv` — 0 rows with any NaN,
+including **0 of 2,061 non-linear peptides**; `peptide_features_peptideclm.csv` — 0 NaN
+rows, **0 of 2,061 non-linear**. Both cover all 12,371 peptides. This is consistent with
+featurizing from SMILES rather than sequence: the 1,483 peptides that QMAP's
+sequence-based clustering cannot score (§C1) are featurized without issue.
+
+### D2. Organism representations
+
+| | one-hot / vocab embedding | k-mer composition | DNA-BERT2 |
+|---|---|---|---|
+| Status | **implemented** | **implemented** | **not started** |
+| Registry name | `vocab_embedding` | `kmer_composition` | — |
+| `output_kind` | `index` (→ `nn.Embedding`) | `vector` (→ `nn.Linear`) | — |
+| Dim | **vocab_size 4** (3 organisms + index 0 reserved for OOV) | **340** | — |
+| Artifact | `data/organism_vocab_vocab_embedding.json` | `data/organism_vocab_kmer_composition.json` | — |
+| Details | sequential integer per organism; `unknown_index: 0` | k = **1, 2, 3, 4** (4+16+64+256 = 340), **L2-normalized per k-block**, overlapping sliding-window counts (`src/soamp/features/kmer.py`) over each organism's RefSeq genomic FASTA | — |
+
+A repo-wide grep for `dnabert` returns nothing.
+
+**Genome coverage**: **3 organisms have a genome FASTA; 0 are missing** — because the
+model-ready dataset contains exactly those 3 organisms.
+`config/organism_genomes/organism_genome_accessions.csv`:
+
+| organism | taxon | RefSeq assembly |
+|---|---|---|
+| Escherichia coli | 562 | GCF_000005845.2 |
+| Staphylococcus aureus | 1280 | GCF_000013425.1 |
+| Pseudomonas aeruginosa | 287 | GCF_000006765.1 |
+
+All sourced via the NCBI Datasets v2 API, `reference_only=true`, 2026-09-09.
+The `genus_features` block of the k-mer artifact is **empty** (0 genus rows).
+
+**Organisms without a genome** (`src/soamp/features/organism_featurizers.py:104, 158-161, 176-178`):
+lookup is species-exact → genus fallback (first word) → **all-zero 340-dim vector**.
+At `fit` time, however, an organism that resolves to nothing raises
+`OrganismFeaturizerError` rather than silently zeroing — so the all-zero path only
+applies at inference. For `vocab_embedding`, an unseen organism maps to index 0 (OOV)
+and degrades gracefully.
+
+### D3. Model architectures trained, and the grid
+
+**Fusion.** Both architectures share `OrganismEncoder`
+(`src/soamp/model/baseline_mlp.py`), which dispatches on `output_kind`: an
+`nn.Embedding` lookup for `index` strategies, an `nn.Linear` projection for `vector`
+strategies.
+
+| | `baseline_classifier` | `attention_fusion_classifier` |
+|---|---|---|
+| File | `src/soamp/model/baseline_mlp.py` | `src/soamp/model/attention_fusion.py` |
+| Fusion | concatenate **raw** peptide vector + organism embedding → MLP → 1 logit | project peptide and organism each to `projection_dim`, treat as a **2-token sequence**, self-attend (residual + LayerNorm + learned 2-slot position embedding), concatenate attended tokens → MLP head → 1 logit |
+| Hyperparameters (`config/train/base.yaml`) | `organism_embed_dim: 8`, `hidden_dims: [32, 16]` | `projection_dim: 128`, `num_attention_heads: 4`, `num_attention_layers: 1`, `hidden_dims: [64, 32]` |
+
+Shared training hyperparameters (`config/train/base.yaml`, unchanged in every overlay):
+Adam, `learning_rate 0.001`, `weight_decay 0.0`, `batch_size 256`, `epochs 30`
+(CV: 5), `seed 42`, `BCEWithLogitsLoss` with class-balanced `pos_weight`
+(`class_balancing.mode: auto`), best checkpoint by `val_auroc`.
+
+**Hyperparameters searched: none.** No sweep config exists anywhere in `config/`
+(§3 of the project guideline asks for one; it has not been written). Every completed
+run uses the values above. **NOT AVAILABLE**: any hyperparameter-search result.
+
+**W&B naming convention.** Project `soamp`. Run name = `exp_id` from the config
+(`build_tracker(..., run_name=CFG.exp_id)`). Convention:
+`<peptide_method>_<organism_method>_<architecture-abbrev>` for the single-split runs
+(e.g. `rdkit_vocab_attnfusion`) and `<peptide>_<organism>_cv` for CV runs.
+`job_type` is `"train"` or `"kfold_cv"`; `wandb_group` is `featurization_grid_v1`
+(single-split) or `featurization_grid_cv_v1` (CV); tags carry the method names.
+
+**The grid is 2 × 2, not 3 × 3** — there is no third peptide representation (no GNN)
+and no third organism representation (no DNA-BERT2), so six of the nine cells have no
+code behind them, not merely no run.
+
+| peptide ↓ / organism → | `vocab_embedding` | `kmer_composition` | DNA-BERT2 |
+|---|---|---|---|
+| `rdkit_descriptors` | **done** — single-split + CV | **done** — single-split only | not started (no featurizer) |
+| `peptideclm_embedding` | **done** — single-split only | **done** — single-split + CV | not started (no featurizer) |
+| molecular graph (GNN) | not started (no featurizer) | not started | not started |
+
+Headline CV metric (5-fold mean val AUROC, 5 epochs/fold) for the two cells with CV:
+`rdkit x vocab` **0.7637 ± 0.0166**; `peptideclm x kmer` **0.7927 ± 0.0345**.
+The other two cells have **no CV run** (`config/train/cv_rdkit_kmer.yaml` and
+`cv_peptideclm_vocab.yaml` exist, but no `reports/cv_results_*` or log for them).
+
+---
+
+## SECTION E — Evaluation
+
+### E1. Metrics
+
+`src/soamp/engine/metrics.py`. `compute_binary_metrics` returns exactly:
+
+| metric | definition |
+|---|---|
+| `accuracy` | `sklearn.metrics.accuracy_score` on `sigmoid(logit) ≥ 0.5` |
+| `f1` | `sklearn.metrics.f1_score` — **binary, positive class = `active`** (`LABEL_TO_INT`); *not* macro/micro |
+| `precision` | `precision_score`, positive class = active, `zero_division=0` |
+| `recall` | `recall_score`, same |
+| `auroc` | `roc_auc_score` on the sigmoid probability |
+
+Decision threshold is a hardcoded **0.5** (`logits_to_predictions(..., threshold=0.5)`);
+it is not swept and not config-driven.
+Single-class label sets raise `MetricsError` rather than silently returning NaN.
+
+**Per-organism metrics**: `compute_metrics_by_organism` buckets by the eval rows' own
+`organism` **string** (not the encoded input, so it works for both `output_kind`s),
+runs the same five metrics per bucket, adds `n`. A single-class bucket is recorded as
+`{'skipped': 'single_class', 'n': …}` instead of raising.
+
+**Non-linear metrics: not implemented.** There is no linear/non-linear slicing anywhere
+in `src/soamp/engine/` or `pipeline/`. The per-slice numbers in E2 below were computed
+*here*, from the stored per-row CV predictions joined to `is_linear` — they are not
+something the pipeline produces.
+
+**Model-selection metric**: `checkpoint.best_metric: val_auroc`
+(`config/train/base.yaml`), validated against `val_auroc | val_accuracy | val_f1 |
+val_loss`, direction from `CheckpointConfig.lower_is_better`. The selected
+`<exp_id>_best.pth` is reloaded before the single test evaluation.
+
+### E2. Results for every completed run
+
+**Split-staleness flag: all seven runs below are flagged.** None used
+`data/peptide_split.csv`. Single-split runs used the QMAP split
+(`split_indices.json` + `val_split.json`); CV runs used `train_folds_leiden.csv`.
+
+**Single held-out test split** (7,587 rows, `split == 'test'`), from
+`reports/train_*_log.txt`. All four grid cells: `attention_fusion_classifier`,
+git SHA `dc07d6bf`, seed 42, 30 epochs, device cuda.
+
+| run name | peptide repr | organism repr | arch | split used | best val AUROC (epoch) | test AUROC | test F1 | test acc |
+|---|---|---|---|---|---|---|---|---|
+| `peptideclm_kmer_attnfusion` | PeptideCLM | k-mer | attn-fusion | QMAP (stale) | 0.8305 (6) | **0.8347** | 0.8667 | 0.7943 |
+| `rdkit_vocab_attnfusion` | RDKit | vocab | attn-fusion | QMAP (stale) | 0.8201 (23) | 0.8331 | **0.8677** | **0.7964** |
+| `rdkit_kmer_attnfusion` | RDKit | k-mer | attn-fusion | QMAP (stale) | 0.8070 (26) | 0.8247 | 0.8278 | 0.7452 |
+| `peptideclm_vocab_attnfusion` | PeptideCLM | vocab | attn-fusion | QMAP (stale) | 0.8260 (3) | 0.8182 | 0.8184 | 0.7348 |
+| `baseline_mlp_v1` (reference, git `a712ba1d`) | RDKit | vocab | baseline MLP | QMAP (stale) | 0.8096 (30) | 0.8374 | 0.8218 | 0.7409 |
+
+Precision/recall are not in the logs; recomputed here by reloading the checkpoints and
+re-scoring the test split (metrics reproduce the logs exactly):
+`peptideclm_kmer` precision 0.9249 / recall 0.8154; `rdkit_vocab` precision 0.9292 /
+recall 0.8138.
+
+**5-fold CV** (5 epochs/fold, device cpu), per-fold val metrics computed here from the
+stored row-level predictions (`reports/cv_results_*.csv`, 85,215 rows each; the logs
+only stored the aggregate).
+
+`rdkit_vocab_cv` (git `dc07d6bf`):
+
+| fold | n val | acc | F1 | AUROC | n non-linear | F1 (non-linear) | AUROC (non-linear) |
+|---|---|---|---|---|---|---|---|
+| 0 | 3,239 | 0.7759 | 0.8573 | 0.7521 | 820 | 0.8580 | 0.8394 |
+| 1 | 3,343 | 0.7083 | 0.8041 | 0.7755 | 402 | 0.8295 | 0.8601 |
+| 2 | 3,259 | 0.8650 | 0.9217 | 0.7868 | 428 | 0.9283 | 0.7872 |
+| 3 | 3,575 | 0.7015 | 0.7983 | 0.7482 | 989 | 0.7982 | 0.7488 |
+| 4 | 3,627 | 0.7119 | 0.8138 | 0.7562 | 599 | 0.7979 | 0.8614 |
+| **mean ± std** | | 0.7525 ± 0.0696 | 0.8390 ± 0.0517 | **0.7637 ± 0.0166** | | **0.8424 ± 0.0541** | 0.8194 ± 0.0496 |
+
+`peptideclm_kmer_cv` (git `b582b3e3`):
+
+| fold | n val | acc | F1 | AUROC | n non-linear | F1 (non-linear) | AUROC (non-linear) |
+|---|---|---|---|---|---|---|---|
+| 0 | 3,239 | 0.7647 | 0.8475 | 0.7824 | 820 | 0.8931 | 0.8416 |
+| 1 | 3,343 | 0.7000 | 0.7952 | 0.8224 | 402 | 0.8834 | 0.8767 |
+| 2 | 3,259 | 0.8147 | 0.8893 | 0.7409 | 428 | 0.8702 | **0.4759** |
+| 3 | 3,575 | 0.6926 | 0.7884 | 0.7918 | 989 | 0.7836 | 0.7785 |
+| 4 | 3,627 | 0.7378 | 0.8297 | 0.8260 | 599 | 0.9366 | 0.9052 |
+| **mean ± std** | | 0.7420 ± 0.0501 | 0.8300 ± 0.0411 | **0.7927 ± 0.0345** | | **0.8734 ± 0.0560** | 0.7756 ± 0.1741 |
+
+Fold-2's non-linear AUROC of 0.476 (below chance) drives the ±0.174 spread — worth
+knowing before putting a non-linear number on a slide.
+
+The mean ± std lines reproduce `reports/train_cv_*_log.txt` (fit/val table) for the
+metrics those logs printed.
+
+### E3. Baselines
+
+| baseline | status |
+|---|---|
+| QMAP (published MIC regression benchmark) | **NOT AVAILABLE** — no QMAP model was run for comparison; QMAP is used only as a corpus/splitter dependency. `pipeline/benchmark.py` and `src/soamp/eval/` do not exist. |
+| PepBenchmark | **NOT AVAILABLE** — no code, config, or artifact anywhere in the repo. |
+| LLAMP-style | **NOT AVAILABLE** — LLAMP informed the k-mer organism featurizer's design only; no LLAMP model was run. |
+| organism-mean MIC | **NOT AVAILABLE** — the task is classification; no regression baseline was run. |
+| majority class | **not run as a baseline**, but trivially derivable from the label column (see below). |
+
+Majority-class reference, computed here from the `label` column (predict `active`
+for everything) — **not from a run**:
+
+| split | rows | accuracy | F1 | AUROC |
+|---|---|---|---|---|
+| QMAP test (the one all results use) | 7,587 | **0.8204** | **0.9013** | 0.5 by definition |
+| pipeline-cluster-split test | 4,734 | 0.8131 | 0.8969 | 0.5 by definition |
+
+**This is the single most important number on this page for a talk.** The
+always-predict-active baseline scores **0.8204 accuracy / 0.9013 F1** on the same test
+split where the best trained model scores **0.7964 accuracy / 0.8677 F1**. On accuracy
+and F1 every trained model is *worse than the trivial baseline*; AUROC (0.82–0.84 vs
+0.5) is the only metric on which the models demonstrably beat it. Any claim about
+model quality should be made in AUROC, with the baseline stated.
+
+**Coverage gaps for baselines**: not applicable, since none were run. For reference,
+the peptides a *sequence-based* baseline could not score is 1,483 / 12,371 (12.0%) —
+the `X`/`x`-placeholder set from §C1.
+
+### E4. Per-organism performance
+
+Held-out test split, 7,587 rows (`reports/train_*_log.txt`). Only 3 organisms exist in
+the model-ready dataset, so a "top 10" is not possible.
+
+| run | *E. coli* (n=2,933) | *S. aureus* (n=2,767) | *P. aeruginosa* (n=1,887) |
+|---|---|---|---|
+| | AUROC / F1 / acc | AUROC / F1 / acc | AUROC / F1 / acc |
+| `peptideclm_kmer_attnfusion` | 0.8544 / 0.8865 / 0.8217 | 0.8480 / 0.8412 / 0.7629 | 0.8179 / 0.8715 / 0.7976 |
+| `rdkit_vocab_attnfusion` | 0.8531 / 0.8834 / 0.8179 | 0.8456 / 0.8622 / 0.7897 | 0.7887 / 0.8507 / 0.7727 |
+| `rdkit_kmer_attnfusion` | 0.8547 / 0.8618 / 0.7896 | 0.8393 / 0.8219 / 0.7383 | 0.7590 / 0.7806 / 0.6863 |
+| `peptideclm_vocab_attnfusion` | 0.8568 / 0.8701 / 0.7995 | 0.8390 / 0.7709 / 0.6834 | 0.7560 / 0.7993 / 0.7096 |
+| `baseline_mlp_v1` | 0.8516 / 0.8232 / 0.7422 | 0.8454 / 0.8516 / 0.7752 | 0.8061 / 0.7707 / 0.6884 |
+
+*P. aeruginosa* is consistently the weakest organism (AUROC 0.756–0.818) and also the
+smallest slice.
+
+Pooled per-organism CV val metrics (computed here from `cv_results_*.csv`):
+
+| organism | `rdkit_vocab_cv` AUROC / F1 | `peptideclm_kmer_cv` AUROC / F1 |
+|---|---|---|
+| *E. coli* (n=6,714) | 0.7635 / 0.8736 | 0.8145 / 0.8556 |
+| *P. aeruginosa* (n=4,348) | 0.7495 / 0.8219 | 0.7790 / 0.8065 |
+| *S. aureus* (n=5,981) | 0.7394 / 0.8123 | 0.7678 / 0.8191 |
+
+### E5. Figures
+
+- `reports/slide_figs/e5_1_featurization_grid_test_metrics.png` — AUROC / F1 / accuracy
+  for the four completed grid cells on the held-out test split. (A *CV non-linear F1
+  across the 3×3 grid* chart is not possible: only 2 of the 4 implemented cells have a
+  CV run, and the grid is 2×2 — see D3.)
+- `reports/slide_figs/e5_2_confusion_matrix_best_model.png` — confusion matrix for
+  `peptideclm_kmer_attnfusion` (best test AUROC) on the 7,587-row test split, produced
+  by reloading `reports/checkpoints/peptideclm_kmer_attnfusion_best.pth` and re-scoring
+  (no retraining; metrics reproduce the log exactly):
+
+| | predicted inactive | predicted active |
+|---|---|---|
+| **true inactive** | 951 | 412 |
+| **true active** | 1,149 | 5,075 |
+
+---
+
+## SECTION F — Caveats
+
+Each of these changes how a number above should be read.
+
+1. **Only 3 of 658 organisms have thresholds.** The entire classification task is scoped
+   to *E. coli* / *S. aureus* / *P. aeruginosa*; 38,747 of 72,587 rows (53.4%) are
+   `unlabeled` purely for lack of a breakpoint.
+2. **Those 3 thresholds are hand-set, not sourced.** `source` reads
+   "user-specified 2026-08-15" — 32 µM / 128 µM for all three, with no CLSI/EUCAST or
+   literature citation behind them.
+3. **One breakpoint pair for three different species.** Gram-negative and Gram-positive
+   organisms share an identical cutoff, which is biologically unjustified.
+4. **The trivial majority-class baseline beats every trained model on accuracy and F1**
+   (0.8204 / 0.9013 vs the best 0.7964 / 0.8677). Only AUROC shows real signal.
+5. **Severe class imbalance: 84.2% active.** A consequence of thresholding at 32 µM on a
+   dataset whose median MIC is 15.1 µM (log₁₀ 1.179) — the cutoff sits above the bulk of
+   the distribution.
+6. **9,210 rows (12.7%) are `uncertain`** and silently dropped at
+   `pipeline/data/01_build_classification_dataset.py`. The model never sees the hardest
+   examples, which inflates every metric.
+7. **No result has been produced on the current split.** `data/peptide_split.csv` was
+   built 2026-09-24; all five training runs and both CV runs predate it and use the
+   QMAP-identity split instead.
+8. **The split the results *do* use leaks by the Tanimoto measure**: 34.0% of its test
+   peptides have a ≥ 0.9-similar train peptide (vs 3.5% under the cluster split).
+   Reported metrics are optimistic relative to what the cluster split would give.
+9. **Three different split artifacts are in play across the reported runs**
+   (`val_split.json` for single-split, `train_folds_leiden.csv` for CV,
+   `peptide_split.csv` for neither) — single-split and CV numbers are not on comparable
+   footing.
+10. **No split artifact carries a version id.** Provenance is file mtime plus an
+    embedded parameter block; there is no `split_version` to cite.
+11. **The four clustering voters barely agree** — all pairwise ARI ≤ 0.124. Calling the
+    result a "consensus" overstates it; 37.3% of peptides change group depending on
+    which consensus mechanism is used.
+12. **33.2% of peptides disagree with their own 10-NN Tanimoto majority** on the
+    consensus partition — the partition cuts across chemically similar peptides.
+13. **QMAP's sequence clustering cannot score 1,483 peptides (12.0%)** containing
+    `X`/`x` placeholders, 390 of them non-linear. The current pipeline split covers them
+    only via the fingerprint half of its union graph.
+14. **Linear/non-linear balance is not controlled in any split.** `peptide_split.csv`
+    balances `has_noncanonical` (a different flag) and realises 6.5% non-linear in test
+    vs 26.2% in fold_2.
+15. **Non-linear-slice metrics are not produced by the pipeline.** The E2 non-linear
+    columns were computed ad hoc here from stored predictions.
+16. **One CV fold's non-linear AUROC is below chance** (0.476, `peptideclm_kmer_cv`
+    fold 2), giving a ±0.174 std — the non-linear CV mean is not stable.
+17. **The CV runs are 5 epochs, the single-split runs 30.** CV numbers are a
+    generalisation estimate, not comparable to the benchmark numbers
+    (`config/train/cv_rdkit_vocab.yaml` says so explicitly).
+18. **Only 2 of 4 implemented grid cells have a CV run.** `cv_rdkit_kmer.yaml` and
+    `cv_peptideclm_vocab.yaml` exist but were never executed.
+19. **The grid is 2×2, not 3×3.** No GNN peptide featurizer and no DNA-BERT2 organism
+    featurizer exist — six cells have no code, not just no run.
+20. **No hyperparameter search was run and no sweep config exists**, contrary to the
+    project's own §3 guideline. Every run uses identical hyperparameters.
+21. **The decision threshold is hardcoded at 0.5** and never tuned — on an 84%-positive
+    dataset this is close to the worst choice for accuracy/F1.
+22. **The four grid checkpoints cannot be loaded on a CPU-only machine** as written:
+    they were saved on CUDA and `Checkpointer.load_weights`
+    (`src/soamp/engine/checkpointer.py:72`) calls `torch.load` without `map_location`,
+    raising `RuntimeError`. Re-scoring for this report required a manual workaround.
+23. **`reports/train_runs/baseline_mlp_v1/` and `reports/pipeline_runs/*/artifacts/*.json`
+    are stale**, left over from a tracking system deleted on 2026-09-06. They are not a
+    live source of lineage.
+24. **No CI, and no tests on the curation pipeline.** `tests/` covers labeling, data,
+    features, model, engine, utils; `pipeline/curation/01`–`08` has none, and no CI
+    workflow exists anywhere in the repo.
+25. **333 of 499 organisms have fewer than 20 records**, so expanding thresholds beyond
+    the top few will quickly hit slices too small to evaluate on.
+26. **1,617 of 1,619 "unexplained temporal drift" peptides were recovered** into the
+    dataset without a confirmed reason for QMAP's original exclusion
+    (`reports/step3_diff_log.txt` bucket b5) — a documented but unresolved discrepancy
+    against the published baseline.
+27. **3,541 peptides remain unconvertible** (`data/unconvertible_peptides.csv`) — the
+    recovery pass supports only `SS` and `HT` cyclisation and `ACT`/`AMD` terminal
+    modifications, so lipidated, PEGylated, thioether- and lactam-cyclised peptides are
+    still largely absent.
+28. **The `uncertain` gray zone (32–128 µM) is wide** — nearly a full log₁₀ unit — so
+    what counts as a "hard example" is a large fraction of the plausible activity range.
+
+---
+
+## Figure index
+
+All PNG, 300 dpi, white background, large fonts, no baked-in titles, in
+`reports/slide_figs/`:
+
+| File | Section | Content |
+|---|---|---|
+| `b4_1_mic_distribution.png` | B4 | log₁₀ MIC (µM) histogram, 72,587 records, breakpoints marked |
+| `b4_2_records_per_organism_top30.png` | B4 | records per organism, top 30, log-scale bar |
+| `b4_3_peptide_length_by_linearity.png` | B4 | peptide length histogram, linear vs non-linear |
+| `c6_tanimoto_leakage_cluster_vs_random.png` | C6 | max test→train Tanimoto, cluster vs QMAP vs random split |
+| `c7_umap_by_split.png` | C7 | PeptideCLM-embedding UMAP coloured train/test |
+| `c7_umap_by_linearity.png` | C7 | same UMAP coloured linear/non-linear |
+| `c7_voter_ari_heatmap.png` | C5/C7 | pairwise ARI between the four voters |
+| `e5_1_featurization_grid_test_metrics.png` | E5 | test AUROC/F1/accuracy across the 4 completed grid cells |
+| `e5_2_confusion_matrix_best_model.png` | E5 | confusion matrix, `peptideclm_kmer_attnfusion`, test split |
+
+Supporting data (not figures): `_ari_matrix.csv`, `_maxsim.npz`,
+`_maxsim_summary.json`, `_umap_peptideclm.npy`,
+`_testpred_peptideclm_kmer_attnfusion.npz`, `_testpred_rdkit_vocab_attnfusion.npz`.

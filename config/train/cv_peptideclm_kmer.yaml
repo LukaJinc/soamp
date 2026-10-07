@@ -15,7 +15,7 @@ loop:
 # Distinct from featurization_grid_v1 -- cross-fold val metrics and the
 # real held-out test metrics measure different things and shouldn't mix in
 # wandb's comparison views.
-wandb_group: featurization_grid_cv_v1
+wandb_group: featurization_grid_cv_v2
 wandb_tags:
   - peptideclm_embedding
   - kmer_composition

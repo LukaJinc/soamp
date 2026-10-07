@@ -1,10 +1,12 @@
 """
-Cross-validation step: 5-fold CV over data/train_folds_leiden.csv's
-Leiden-community folds, reproducing scripts/EDA/build_dataset_build_model.ipynb's
-exploratory CV loop as a real, tested pipeline stage -- see
-src/soamp/engine/cross_validation.py for the per-fold train+eval logic this
-orchestrates, and its module docstring for why the fold file is joined on
-`sequence` and not `node_id`/`peptide_id`.
+Cross-validation step: 5-fold CV over the folds in data/peptide_split.csv
+(built by pipeline/splitting/01_build_peptide_split.py), reproducing
+scripts/EDA/build_dataset_build_model.ipynb's exploratory CV loop as a real,
+tested pipeline stage -- see src/soamp/engine/cross_validation.py for the
+per-fold train+eval logic this orchestrates, and its module docstring for why
+the split file is joined on `peptide_id` and not `sequence`. The train
+population is the split file's own `split == "train"` peptides, not the
+older `split` column of mic_classification_dataset.csv.
 
 This is a *different stage* from pipeline/train.py, not a second
 implementation of the same training loop (CLAUDE.md sec 1): pipeline/train.py
@@ -20,8 +22,9 @@ single-split benchmark and this CV estimate.
 
 Output: reports/cv_results_<exp_id>.csv (row-level -- see
 soamp.engine.cross_validation.train_and_evaluate_fold's docstring for exact
-columns), reports/train_cv_<exp_id>_log.txt (summary), plus a wandb run
-(job_type="kfold_cv") with per-fold history, an organism_activity_thresholds
+columns), reports/cv_loss_curves_<exp_id>.csv (fold, epoch, fit_loss,
+val_loss, val_auroc), reports/train_cv_<exp_id>_log.txt (summary), plus a
+wandb run (job_type="kfold_cv") with per-epoch loss curves, per-fold history, an organism_activity_thresholds
 artifact, cross-fold mean/std summary, and a cv_results Artifact.
 """
 import argparse
@@ -35,8 +38,8 @@ from dotenv import load_dotenv
 from soamp.data.factory import build_dataset
 from soamp.engine.config import REPO_ROOT, TrainConfig
 from soamp.engine.cross_validation import (
-    assign_fold_ids,
-    load_fold_assignments,
+    assign_train_folds,
+    load_peptide_split,
     summarize_cv_metrics,
     train_and_evaluate_fold,
 )
@@ -50,23 +53,29 @@ load_dotenv()
 
 METRIC_NAMES = ["accuracy", "f1", "precision", "recall", "auroc"]
 
-# Hand-transcribed from scripts/EDA/generate_leiden_train_folds.ipynb -- that
-# notebook builds train_folds_leiden.csv and isn't re-run here, so keep this
-# in sync manually if its params ever change. Static provenance about a fixed
+# Hand-transcribed from config/splitting/base.yaml -- the folds come from
+# pipeline/splitting/01_build_peptide_split.py (data/peptide_split.json holds
+# the exact parameters of the committed run), not re-run here, so keep this in
+# sync manually if those params ever change. Static provenance about a fixed
 # committed artifact, not a per-run tunable -- see CVConfig for the one part
 # of this (which folds file to read) that is config-driven.
 FOLD_GENERATION_METADATA = {
-    "method": "sequence-identity graph (blosum45 alignment) + Leiden community "
-              "detection; folds = greedy cumulative-count binning of communities "
-              "into n_folds groups",
+    "method": "union graph (Morgan/ECFP Tanimoto >= 0.8 OR QMAP BLOSUM45 identity "
+              ">= 0.6) with duplicate/near-duplicate pairs contracted into one node, "
+              "Leiden community detection, whole-cluster assignment to test + n_folds "
+              "balancing size, active fraction and non-canonical fraction over "
+              "(peptide, organism) records",
+    "fingerprint_threshold": 0.8,
     "identity_threshold": 0.60,
+    "hard_link_fingerprint_threshold": 0.95,
+    "hard_link_identity_threshold": 0.90,
     "substitution_matrix": "blosum45",
     "gap_open": 5,
     "gap_extension": 1,
-    "leiden_n_iterations": -1,
+    "leiden_n_iterations": 2,
     "leiden_seed": 42,
     "n_folds": 5,
-    "source_notebook": "scripts/EDA/generate_leiden_train_folds.ipynb",
+    "source_script": "pipeline/splitting/01_build_peptide_split.py",
 }
 
 
@@ -81,6 +90,7 @@ def main() -> None:
     CFG = load_config(args.config, TrainConfig)
     LOG_PATH = CFG.paths.reports_dir / f"train_cv_{CFG.exp_id}_log.txt"
     RESULTS_CSV_PATH = CFG.paths.reports_dir / f"cv_results_{CFG.exp_id}.csv"
+    LOSS_CURVES_CSV_PATH = CFG.paths.reports_dir / f"cv_loss_curves_{CFG.exp_id}.csv"
 
     log = configure_logging("train_cv")
     log.info(f"Loaded config: {args.config} (exp_id={CFG.exp_id})")
@@ -93,9 +103,7 @@ def main() -> None:
 
     with open(classification_csv, newline="") as f:
         all_rows = list(csv.DictReader(f))
-    train_rows = [r for r in all_rows if r["split"] == "train"]
-    fold_by_sequence = load_fold_assignments(folds_csv)
-    train_rows = assign_fold_ids(train_rows, fold_by_sequence)
+    train_rows = assign_train_folds(all_rows, load_peptide_split(folds_csv))
     fold_ids = sorted(set(r["fold_id"] for r in train_rows))
     log.info(f"{len(train_rows)} train rows across {len(fold_ids)} folds: {fold_ids}")
 
@@ -152,6 +160,14 @@ def main() -> None:
         group=CFG.wandb_group, tags=CFG.wandb_tags,
     )
 
+    # Per-epoch curves are x-axis'd by "epoch"; the per-fold summary rows
+    # below by "fold" -- separate step metrics so the two don't clash.
+    run.define_metric("epoch")
+    run.define_metric("fold/*", step_metric="epoch")
+    run.define_metric("fold")
+    for prefix in ("fit", "val"):
+        run.define_metric(f"{prefix}/*", step_metric="fold")
+
     thresholds_df = pd.read_csv(REPO_ROOT / "config/thresholds/organism_thresholds.csv")
     organisms_used = sorted({r["organism"] for r in train_rows})
     organism_thresholds = thresholds_df[
@@ -163,11 +179,21 @@ def main() -> None:
 
     fold_results = []
     fold_metrics_rows = []
+    loss_curve_rows = []
     for fold_id in fold_ids:
         row_groups = {
             "fit": [r for r in train_rows if r["fold_id"] != fold_id],
             "val": [r for r in train_rows if r["fold_id"] == fold_id],
         }
+        def log_epoch(entry: dict, fold_id=fold_id) -> None:
+            loss_curve_rows.append({"val_fold_id": fold_id, **entry})
+            run.log({
+                "epoch": entry["epoch"],
+                f"fold/{fold_id}/fit_loss": entry["fit_loss"],
+                f"fold/{fold_id}/val_loss": entry["val_loss"],
+                f"fold/{fold_id}/val_auroc": entry["val_auroc"],
+            })
+
         metrics_by_group, results_df = train_and_evaluate_fold(
             row_groups,
             eval_groups=("fit", "val"),
@@ -184,6 +210,7 @@ def main() -> None:
             class_balancing_fixed_pos_weight=CFG.class_balancing.fixed_pos_weight,
             device=device,
             watch=True,
+            on_epoch_end=log_epoch,
         )
         fit_m, val_m = metrics_by_group["fit"], metrics_by_group["val"]
         log.info(
@@ -195,7 +222,7 @@ def main() -> None:
             **{f"fit/{k}": v for k, v in fit_m.items()},
             **{f"val/{k}": v for k, v in val_m.items()},
             "n_fit": len(row_groups["fit"]), "n_val": len(row_groups["val"]),
-        }, step=int(fold_id))
+        })
 
         results_df["val_fold_id"] = fold_id
         fold_results.append(results_df)
@@ -214,9 +241,12 @@ def main() -> None:
 
     CFG.paths.reports_dir.mkdir(parents=True, exist_ok=True)
     cv_results_df.to_csv(RESULTS_CSV_PATH, index=False)
+    loss_curves_df = pd.DataFrame(loss_curve_rows)
+    loss_curves_df.to_csv(LOSS_CURVES_CSV_PATH, index=False)
 
     results_artifact = wandb.Artifact(name="cv_results", type="results")
     results_artifact.add(wandb.Table(dataframe=cv_results_df), "cv_results")
+    results_artifact.add(wandb.Table(dataframe=loss_curves_df), "cv_loss_curves")
     logged_results_artifact = run.log_artifact(results_artifact)
     logged_results_artifact.wait()  # block until server-side commit, so the round-trip
                                      # fetch right below doesn't race the async upload
@@ -239,6 +269,7 @@ def main() -> None:
         f"epochs per fold: {CFG.loop.epochs}",
         f"folds: {fold_ids}",
         f"cv_results_df: {RESULTS_CSV_PATH} ({len(cv_results_df)} rows)",
+        f"loss curves: {LOSS_CURVES_CSV_PATH} ({len(loss_curves_df)} rows)",
         f"mean +/- std across folds:\n{summary_df}",
     ]
     with open(LOG_PATH, "w") as f:

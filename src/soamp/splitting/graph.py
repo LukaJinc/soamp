@@ -135,3 +135,50 @@ def build_union_graph(n_nodes: int, *edge_sets: dict[tuple[int, int], float]) ->
     A node with edges in neither input set is still present as an isolated
     vertex, never dropped."""
     return ig.Graph(n=n_nodes, edges=union_edges(*edge_sets), directed=False)
+
+
+def duplicate_pairs(sequences: list[str], smiles: list[str]) -> list[tuple[int, int]]:
+    """Index pairs (i<j) of peptides that are the same molecule by label:
+    identical SMILES, or identical case-folded sequence among QMAP-scoreable
+    ones. Sequences containing the 'X' placeholder are deliberately skipped:
+    'X' stands for different non-canonical residues in different peptides, so
+    the string alone does not identify the molecule (SMILES does)."""
+    if len(sequences) != len(smiles):
+        raise GraphBuildError(
+            f"sequences ({len(sequences)}) and smiles ({len(smiles)}) must be the same length"
+        )
+    pairs: set[tuple[int, int]] = set()
+    for keys in (
+        [smi or None for smi in smiles],
+        [seq.upper() if is_qmap_scoreable(seq) else None for seq in sequences],
+    ):
+        first_seen: dict[str, int] = {}
+        for idx, key in enumerate(keys):
+            if key is None:
+                continue
+            if key in first_seen:
+                pairs.add((first_seen[key], idx))
+            else:
+                first_seen[key] = idx
+    return sorted(pairs)
+
+
+def contract_hard_links(
+    n_nodes: int, linked_pairs: list[tuple[int, int]], *edge_sets: dict[tuple[int, int], float]
+) -> tuple[ig.Graph, list[int]]:
+    """Contracts every connected group of `linked_pairs` (duplicate /
+    near-duplicate peptides) into a single node and returns
+    (contracted union graph, node_of_peptide). Clustering the contracted
+    graph guarantees linked peptides share a community without the giant
+    cluster that merging already-formed communities produces (communities
+    chain together through many cross-community links). The contracted graph
+    is simple: parallel edges collapse and self-loops are dropped."""
+    hard = ig.Graph(n=n_nodes, edges=linked_pairs, directed=False)
+    node_of_peptide = hard.connected_components().membership
+    n_groups = max(node_of_peptide) + 1 if node_of_peptide else 0
+    edges = {
+        (min(a, b), max(a, b))
+        for (i, j) in union_edges(*edge_sets)
+        if (a := node_of_peptide[i]) != (b := node_of_peptide[j])
+    }
+    return ig.Graph(n=n_groups, edges=sorted(edges), directed=False), node_of_peptide

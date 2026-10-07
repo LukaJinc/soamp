@@ -139,10 +139,10 @@ class CheckpointConfig(BaseModel):
 class CVConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    # Sequence-keyed fold assignments (soamp.engine.cross_validation reads
-    # this by "sequence", not "node_id"/"peptide_id" -- see that module's
-    # docstring for why the other two are the wrong join key).
-    folds_csv_filename: str = "train_folds_leiden.csv"
+    # peptide_id-keyed train/test split + CV fold assignments, written by
+    # pipeline/splitting/01_build_peptide_split.py (soamp.engine.cross_validation
+    # reads it by peptide_id -- see that module's docstring).
+    folds_csv_filename: str = "peptide_split.csv"
 
 
 class TrainConfig(BaseModel):
