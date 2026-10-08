@@ -91,3 +91,18 @@ def test_base_override_composition(tmp_path):
     )
     cfg = load_config(override, FeaturesConfig)
     assert cfg.peptide_featurization.rdkit_descriptors.descriptor_names == ["MolWt"]
+
+
+def test_molgraph_peptide_yaml_loads_with_molecular_graph_method():
+    cfg = load_config("config/features/peptide_molgraph.yaml", FeaturesConfig)
+    assert cfg.peptide_featurization.method == "molecular_graph"
+    assert cfg.peptide_featurization.active_kwargs() == {}
+    assert cfg.output_files.peptide_feature_scaler_filename == "peptide_feature_scaler_molgraph.json"
+
+
+def test_dnabert_organism_yaml_loads_with_dnabert_method_and_pinned_revision():
+    cfg = load_config("config/features/organism_dnabert.yaml", FeaturesConfig)
+    assert cfg.organism_featurization.method == "dnabert_s_16s"
+    assert cfg.organism_featurization.active_kwargs() == {"embeddings_path": "data/organism_16s_dnabert_s.json"}
+    assert cfg.organism_16s_embedding.checkpoint == "zhihan1996/DNABERT-S"
+    assert len(cfg.organism_16s_embedding.revision) == 40  # a commit hash, never a branch name

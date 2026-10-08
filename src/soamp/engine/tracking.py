@@ -39,6 +39,9 @@ def build_tracker(
         **hyperparams,
         "peptide_method": featurization.peptide_method,
         "peptide_feature_dim": featurization.peptide_feature_dim,
+        "peptide_input_kind": featurization.peptide_input_kind,
+        "graph_node_dim": featurization.graph_node_dim,
+        "graph_edge_dim": featurization.graph_edge_dim,
         "descriptor_names": featurization.descriptor_names,
         "organism_method": featurization.organism_method,
         "organism_output_kind": featurization.organism_output_kind,
@@ -58,3 +61,10 @@ def watch_model(model, *, log: str = "all", log_graph: bool = True, log_freq: in
     no built-in activation-value logging; not attempted here).
     """
     wandb.watch(model, log=log, log_graph=log_graph, log_freq=log_freq)
+
+
+def count_parameters(model) -> int:
+    """Trainable parameter count -- logged to every run's summary so
+    representations with very different model sizes (e.g. the small GNN vs a
+    768-d embedding projection) can be compared on equal footing."""
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)

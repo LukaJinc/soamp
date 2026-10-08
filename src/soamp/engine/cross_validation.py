@@ -23,9 +23,9 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader
 
 from soamp.data.factory import build_dataset
+from soamp.data.loaders import build_loader
 from soamp.data.torch_dataset import LABEL_TO_INT
 from soamp.engine.class_balancing import resolve_pos_weight
 from soamp.engine.metrics import compute_binary_metrics, logits_to_predictions
@@ -87,10 +87,12 @@ def train_and_evaluate_fold(
     organism_method: str,
     architecture: str,
     architecture_kwargs: dict | None = None,
+    graph_encoder_kwargs: dict | None = None,
     peptide_method_kwargs: dict | None = None,
     organism_method_kwargs: dict | None = None,
     batch_size: int = 64,
     learning_rate: float = 1e-3,
+    weight_decay: float = 0.0,
     class_balancing_mode: str = "auto",
     class_balancing_fixed_pos_weight: float | None = None,
     device: "torch.device | str | None" = None,
@@ -153,16 +155,19 @@ def train_and_evaluate_fold(
     # decouples model-init/training determinism from that entirely, so
     # `seed` alone controls the model regardless of featurization caching.
     torch.manual_seed(seed)
-    model = build_model(bundle, architecture=architecture, **(architecture_kwargs or {}))
+    model = build_model(
+        bundle, architecture=architecture, graph_encoder_kwargs=graph_encoder_kwargs,
+        **(architecture_kwargs or {}),
+    )
 
-    fit_loader = DataLoader(bundle.datasets["fit"], batch_size=batch_size, shuffle=True)
+    fit_loader = build_loader(bundle.datasets["fit"], batch_size, shuffle=True)
 
     fit_labels = [LABEL_TO_INT[row["label"]] for row in row_groups["fit"]]
     pos_weight = resolve_pos_weight(class_balancing_mode, class_balancing_fixed_pos_weight, fit_labels)
     loss_fn = torch.nn.BCEWithLogitsLoss(
         pos_weight=torch.tensor(pos_weight, device=resolved_device) if pos_weight is not None else None
     )
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     trainer = Trainer(model, optimizer, loss_fn, device=resolved_device)
 
     if watch:
@@ -172,7 +177,7 @@ def train_and_evaluate_fold(
         watch_model(model)
 
     val_loader = (
-        DataLoader(bundle.datasets["val"], batch_size=batch_size)
+        build_loader(bundle.datasets["val"], batch_size)
         if on_epoch_end is not None else None
     )
     for epoch in range(1, epochs + 1):
@@ -191,7 +196,7 @@ def train_and_evaluate_fold(
     metrics_by_group = {}
     group_frames = []
     for group in eval_groups:
-        eval_loader = DataLoader(bundle.datasets[group], batch_size=batch_size)
+        eval_loader = build_loader(bundle.datasets[group], batch_size)
         eval_out = trainer.evaluate(eval_loader)
         metrics_by_group[group] = compute_binary_metrics(eval_out["logits"], eval_out["labels"])
 

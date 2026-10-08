@@ -37,6 +37,7 @@ from soamp.features.organism_featurizers import (
     build_organism_featurizer,
     organism_featurizer_from_artifact,
 )
+from soamp.features.molgraph import EDGE_DIM as GRAPH_EDGE_DIM, NODE_DIM as GRAPH_NODE_DIM
 from soamp.features.peptide import index_feature_rows_by_peptide_id, select_unique_peptides
 from soamp.features.peptide_featurizers import PeptideFeaturizer, build_peptide_featurizer
 from soamp.features.scaling import fit_scaler
@@ -57,7 +58,9 @@ class DatasetFactoryError(ValueError):
 @dataclass
 class Featurization:
     descriptor_names: list[str]
-    peptide_feature_dim: int
+    # None for graph peptide input (no fixed raw vector; the model's GNN
+    # produces one) -- see peptide_input_kind / graph_*_dim below.
+    peptide_feature_dim: int | None
     scaler: dict  # {"descriptor_names", "mean", "scale"}
     organism_vocab: dict[str, int] | None
     unknown_index: int
@@ -66,6 +69,12 @@ class Featurization:
     organism_feature_dim: int | None = None
     peptide_method: str = DEFAULT_PEPTIDE_METHOD
     organism_method: str = DEFAULT_ORGANISM_METHOD
+    peptide_input_kind: Literal["vector", "graph"] = "vector"
+    graph_node_dim: int | None = None
+    graph_edge_dim: int | None = None
+
+
+GRAPH_SCALER_STUB = {"descriptor_names": [], "mean": [], "scale": []}
 
 
 @dataclass
@@ -79,6 +88,7 @@ def _dataset_from_featurization(
     peptide_features: dict[str, dict[str, float]],
     featurization: Featurization,
     organism_featurizer: OrganismFeaturizer,
+    peptide_graphs: dict | None = None,
 ) -> PeptideOrganismDataset:
     return PeptideOrganismDataset(
         rows=rows,
@@ -87,7 +97,33 @@ def _dataset_from_featurization(
         scaler_mean=featurization.scaler["mean"],
         scaler_scale=featurization.scaler["scale"],
         organism_featurizer=organism_featurizer,
+        peptide_graphs=peptide_graphs,
     )
+
+
+def _graph_featurization(
+    organism_featurizer: OrganismFeaturizer, organism_method: str
+) -> Featurization:
+    return Featurization(
+        descriptor_names=[],
+        peptide_feature_dim=None,
+        scaler={**GRAPH_SCALER_STUB, "method": "molecular_graph"},
+        organism_vocab=getattr(organism_featurizer, "vocab", None),
+        unknown_index=getattr(organism_featurizer, "unknown_index", 0),
+        organism_vocab_size=organism_featurizer.vocab_size,
+        organism_output_kind=organism_featurizer.output_kind,
+        organism_feature_dim=organism_featurizer.feature_dim,
+        peptide_method="molecular_graph",
+        organism_method=organism_method,
+        peptide_input_kind="graph",
+        graph_node_dim=GRAPH_NODE_DIM,
+        graph_edge_dim=GRAPH_EDGE_DIM,
+    )
+
+
+def _graphs_by_peptide_id(all_rows: list[dict]) -> dict:
+    featurizer = build_peptide_featurizer("molecular_graph")
+    return {r["peptide_id"]: r["graph"] for r in featurizer.transform(select_unique_peptides(all_rows))}
 
 
 def build_dataset(
@@ -155,8 +191,6 @@ def _build_dataset_from_artifacts(
 
     with open(resolved_data_dir / classification_dataset_filename, newline="") as f:
         all_rows = list(csv.DictReader(f))
-    with open(resolved_data_dir / peptide_features_filename, newline="") as f:
-        peptide_feature_rows = list(csv.DictReader(f))
     with open(resolved_data_dir / organism_vocab_filename) as f:
         vocab_data = json.load(f)
     with open(resolved_data_dir / peptide_feature_scaler_filename) as f:
@@ -164,26 +198,40 @@ def _build_dataset_from_artifacts(
     with open(resolved_data_dir / val_split_filename) as f:
         val_split = json.load(f)
 
-    descriptor_names = scaler["descriptor_names"]
-    peptide_features = index_feature_rows_by_peptide_id(peptide_feature_rows, descriptor_names)
+    peptide_graphs = None
+    if scaler.get("method") == "molecular_graph":
+        # Graph input has no feature CSV / fitted scaler: graphs are a fixed
+        # function of each row's SMILES, built here directly.
+        peptide_feature_rows, descriptor_names, peptide_features = [], [], {}
+        peptide_graphs = _graphs_by_peptide_id(all_rows)
+    else:
+        with open(resolved_data_dir / peptide_features_filename, newline="") as f:
+            peptide_feature_rows = list(csv.DictReader(f))
+        descriptor_names = scaler["descriptor_names"]
+        peptide_features = index_feature_rows_by_peptide_id(peptide_feature_rows, descriptor_names)
 
     # organism_vocab.json is self-describing via its "method" field (same
     # principle as the peptide side's scaler artifact) -- no filename
     # bifurcation needed to support a second organism method.
     organism_featurizer = organism_featurizer_from_artifact(vocab_data)
 
-    featurization = Featurization(
-        descriptor_names=descriptor_names,
-        peptide_feature_dim=len(descriptor_names),
-        scaler=scaler,
-        organism_vocab=getattr(organism_featurizer, "vocab", None),
-        unknown_index=getattr(organism_featurizer, "unknown_index", 0),
-        organism_vocab_size=organism_featurizer.vocab_size,
-        organism_output_kind=organism_featurizer.output_kind,
-        organism_feature_dim=organism_featurizer.feature_dim,
-        peptide_method=scaler.get("method", DEFAULT_PEPTIDE_METHOD),
-        organism_method=vocab_data.get("method", DEFAULT_ORGANISM_METHOD),
-    )
+    if peptide_graphs is not None:
+        featurization = _graph_featurization(
+            organism_featurizer, vocab_data.get("method", DEFAULT_ORGANISM_METHOD)
+        )
+    else:
+        featurization = Featurization(
+            descriptor_names=descriptor_names,
+            peptide_feature_dim=len(descriptor_names),
+            scaler=scaler,
+            organism_vocab=getattr(organism_featurizer, "vocab", None),
+            unknown_index=getattr(organism_featurizer, "unknown_index", 0),
+            organism_vocab_size=organism_featurizer.vocab_size,
+            organism_output_kind=organism_featurizer.output_kind,
+            organism_feature_dim=organism_featurizer.feature_dim,
+            peptide_method=scaler.get("method", DEFAULT_PEPTIDE_METHOD),
+            organism_method=vocab_data.get("method", DEFAULT_ORGANISM_METHOD),
+        )
 
     train_rows = [r for r in all_rows if r["split"] == "train"]
     test_rows = [r for r in all_rows if r["split"] == "test"]
@@ -191,9 +239,10 @@ def _build_dataset_from_artifacts(
     fit_rows, val_rows = apply_val_split(train_rows, val_peptide_ids)
 
     datasets = {
-        "fit": _dataset_from_featurization(fit_rows, peptide_features, featurization, organism_featurizer),
-        "val": _dataset_from_featurization(val_rows, peptide_features, featurization, organism_featurizer),
-        "test": _dataset_from_featurization(test_rows, peptide_features, featurization, organism_featurizer),
+        name: _dataset_from_featurization(
+            rows, peptide_features, featurization, organism_featurizer, peptide_graphs
+        )
+        for name, rows in (("fit", fit_rows), ("val", val_rows), ("test", test_rows))
     }
     return DatasetBundle(datasets=datasets, featurization=featurization)
 
@@ -227,11 +276,16 @@ def _build_dataset_from_rows(
 
     peptide_featurizer.fit(fit_unique_peptides)
     feature_rows = peptide_featurizer.transform(unique_peptides)
+    is_graph = peptide_featurizer.input_kind == "graph"
     descriptor_names = peptide_featurizer.feature_names
-    peptide_features = index_feature_rows_by_peptide_id(feature_rows, descriptor_names)
-
-    fit_feature_rows = [row for row in feature_rows if row["peptide_id"] in fit_peptide_ids]
-    scaler = fit_scaler(fit_feature_rows, descriptor_names)
+    if is_graph:
+        peptide_features, scaler = {}, {**GRAPH_SCALER_STUB, "method": "molecular_graph"}
+        peptide_graphs = {row["peptide_id"]: row["graph"] for row in feature_rows}
+    else:
+        peptide_graphs = None
+        peptide_features = index_feature_rows_by_peptide_id(feature_rows, descriptor_names)
+        fit_feature_rows = [row for row in feature_rows if row["peptide_id"] in fit_peptide_ids]
+        scaler = fit_scaler(fit_feature_rows, descriptor_names)
 
     organism_featurizer: OrganismFeaturizer = build_organism_featurizer(
         organism_method, **organism_method_kwargs
@@ -239,21 +293,26 @@ def _build_dataset_from_rows(
     fit_organisms = [r["organism"] for r in fit_rows]
     organism_featurizer.fit(fit_organisms)
 
-    featurization = Featurization(
-        descriptor_names=descriptor_names,
-        peptide_feature_dim=len(descriptor_names),
-        scaler=scaler,
-        organism_vocab=getattr(organism_featurizer, "vocab", None),
-        unknown_index=getattr(organism_featurizer, "unknown_index", 0),
-        organism_vocab_size=organism_featurizer.vocab_size,
-        organism_output_kind=organism_featurizer.output_kind,
-        organism_feature_dim=organism_featurizer.feature_dim,
-        peptide_method=peptide_method,
-        organism_method=organism_method,
-    )
+    if is_graph:
+        featurization = _graph_featurization(organism_featurizer, organism_method)
+    else:
+        featurization = Featurization(
+            descriptor_names=descriptor_names,
+            peptide_feature_dim=len(descriptor_names),
+            scaler=scaler,
+            organism_vocab=getattr(organism_featurizer, "vocab", None),
+            unknown_index=getattr(organism_featurizer, "unknown_index", 0),
+            organism_vocab_size=organism_featurizer.vocab_size,
+            organism_output_kind=organism_featurizer.output_kind,
+            organism_feature_dim=organism_featurizer.feature_dim,
+            peptide_method=peptide_method,
+            organism_method=organism_method,
+        )
 
     datasets = {
-        name: _dataset_from_featurization(rows, peptide_features, featurization, organism_featurizer)
+        name: _dataset_from_featurization(
+            rows, peptide_features, featurization, organism_featurizer, peptide_graphs
+        )
         for name, rows in row_groups.items()
     }
     return DatasetBundle(datasets=datasets, featurization=featurization)

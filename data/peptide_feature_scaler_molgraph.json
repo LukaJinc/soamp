@@ -1,0 +1,9 @@
+{
+  "method": "molecular_graph",
+  "descriptor_names": [],
+  "mean": [],
+  "scale": [],
+  "node_dim": 36,
+  "edge_dim": 11,
+  "fitted_on": "n/a (fixed function of the SMILES; the GNN is trained in the model)"
+}

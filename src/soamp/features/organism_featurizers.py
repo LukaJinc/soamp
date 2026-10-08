@@ -6,10 +6,11 @@ output_kind tells src/soamp/model/factory.py::build_model whether the
 model should own a learned nn.Embedding ("index") or an nn.Linear
 projection ("vector") for the organism input -- see
 src/soamp/model/baseline_mlp.py::OrganismEncoder. Two methods ship today:
-`vocab_embedding` (output_kind="index") and `kmer_composition`
-(output_kind="vector", genome k-mer composition, modeled on LLAMP) -- both
-implement the same protocol with no model-side changes needed to add
-either.
+`vocab_embedding` (output_kind="index"), `kmer_composition`
+(output_kind="vector", genome k-mer composition, modeled on LLAMP) and
+`dnabert_s_16s` (output_kind="vector", frozen DNABERT-S embedding of the 16S
+rRNA gene) -- all implement the same protocol with no model-side changes
+needed to add any of them.
 """
 import csv
 from pathlib import Path
@@ -19,6 +20,21 @@ from soamp.features.kmer import compute_kmer_composition, parse_fasta_sequences
 from soamp.features.organism import build_vocab, encode
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def resolve_species_then_genus(
+    organism: str,
+    species_features: dict[str, list[float]],
+    genus_features: dict[str, list[float]],
+) -> list[float] | None:
+    """Species-exact match -> genus fallback (first word) -> None, mirroring
+    soamp.common.thresholds.lookup_threshold's precedence. Shared by every
+    genome-derived organism featurizer (k-mer, DNABERT-S)."""
+    organism = organism.strip()
+    if organism in species_features:
+        return species_features[organism]
+    genus = organism.split(" ", 1)[0] if organism else ""
+    return genus_features.get(genus)
 
 
 class OrganismFeaturizerError(ValueError):
@@ -170,13 +186,7 @@ class KmerOrganismFeaturizer:
         return sum(4**k for k in self.k_values)
 
     def _resolve(self, organism: str) -> list[float] | None:
-        organism = organism.strip()
-        if organism in self._species_features:
-            return self._species_features[organism]
-        genus = organism.split(" ", 1)[0] if organism else ""
-        if genus in self._genus_features:
-            return self._genus_features[genus]
-        return None
+        return resolve_species_then_genus(organism, self._species_features, self._genus_features)
 
     def encode(self, organism: str) -> list[float]:
         self._ensure_loaded()
@@ -194,11 +204,95 @@ class KmerOrganismFeaturizer:
         }
 
 
+class DnabertSOrganismFeaturizer:
+    """Frozen DNABERT-S embedding of each organism's 16S rRNA gene
+    (output_kind="vector", 768-d) -- the organism-side analogue of the frozen
+    PeptideCLM peptide representation. DNABERT-S is species-aware by
+    construction (contrastively trained so same-species sequences embed
+    close), which is what an organism representation needs.
+
+    The embedding itself is computed once by
+    pipeline/features/04_embed_organism_16s_dnabert_s.py (it needs an old
+    `transformers` and ideally a GPU) and stored as a small committed table;
+    this class only *reads* that table, so training needs no model, GPU or
+    network. Lookup precedence matches KmerOrganismFeaturizer: species-exact
+    -> genus fallback -> all-zero vector."""
+
+    output_kind: Literal["vector"] = "vector"
+    METHOD = "dnabert_s_16s"
+
+    def __init__(
+        self,
+        embeddings_path: str = "data/organism_16s_dnabert_s.json",
+        species_features: dict[str, list[float]] | None = None,
+        genus_features: dict[str, list[float]] | None = None,
+        embedding_dim: int | None = None,
+    ) -> None:
+        self.embeddings_path = KmerOrganismFeaturizer._resolve_path(embeddings_path)
+        self._species_features = species_features
+        self._genus_features = genus_features
+        self._embedding_dim = embedding_dim
+
+    def _ensure_loaded(self) -> None:
+        if self._species_features is not None and self._genus_features is not None:
+            return
+        import json
+
+        try:
+            with open(self.embeddings_path) as f:
+                table = json.load(f)
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                f"DNABERT-S organism embedding table not found: {self.embeddings_path}. "
+                "Build it with pipeline/features/04_embed_organism_16s_dnabert_s.py "
+                "(see scripts/colab/04_embed_organisms.ipynb) and commit it."
+            ) from None
+        self._species_features = {k: e["vector"] for k, e in table["entries"].items() if e["level"] == "species"}
+        self._genus_features = {k: e["vector"] for k, e in table["entries"].items() if e["level"] == "genus"}
+        self._embedding_dim = table["embedding_dim"]
+
+    def fit(self, fit_organisms: list[str]) -> None:
+        self._ensure_loaded()
+        missing = sorted({o for o in fit_organisms if self._resolve(o) is None})
+        if missing:
+            raise OrganismFeaturizerError(
+                f"no DNABERT-S 16S embedding available for organisms: {missing}"
+            )
+
+    @property
+    def vocab_size(self) -> int | None:
+        return None
+
+    @property
+    def feature_dim(self) -> int | None:
+        self._ensure_loaded()
+        return self._embedding_dim
+
+    def _resolve(self, organism: str) -> list[float] | None:
+        return resolve_species_then_genus(organism, self._species_features, self._genus_features)
+
+    def encode(self, organism: str) -> list[float]:
+        self._ensure_loaded()
+        vector = self._resolve(organism)
+        return vector if vector is not None else [0.0] * self._embedding_dim
+
+    def to_artifact_dict(self) -> dict:
+        self._ensure_loaded()
+        return {
+            "method": self.METHOD,
+            "feature_dim": self._embedding_dim,
+            "species_features": self._species_features,
+            "genus_features": self._genus_features,
+        }
+
+
 def build_organism_featurizer(method: str, **method_kwargs) -> OrganismFeaturizer:
     if method == "vocab_embedding":
         return VocabEmbeddingOrganismFeaturizer(**method_kwargs)
     if method == "kmer_composition":
         return KmerOrganismFeaturizer(**method_kwargs)
+    if method == DnabertSOrganismFeaturizer.METHOD:
+        return DnabertSOrganismFeaturizer(**method_kwargs)
     raise OrganismFeaturizerError(f"unknown organism featurization method: {method!r}")
 
 
@@ -217,5 +311,11 @@ def organism_featurizer_from_artifact(data: dict) -> OrganismFeaturizer:
             k_values=tuple(data["k_values"]),
             species_features=data["species_features"],
             genus_features=data["genus_features"],
+        )
+    if method == DnabertSOrganismFeaturizer.METHOD:
+        return DnabertSOrganismFeaturizer(
+            species_features=data["species_features"],
+            genus_features=data["genus_features"],
+            embedding_dim=data["feature_dim"],
         )
     raise OrganismFeaturizerError(f"unknown organism featurization method in artifact: {method!r}")

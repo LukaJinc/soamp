@@ -1,0 +1,12 @@
+# Peptide side of the featurization grid: molecular graph (atoms = nodes, bonds =
+# edges) from the SMILES, consumed by a small trainable GNN inside the model.
+# Nothing is precomputed: pipeline/features/03_fit_peptide_scaler.py only writes
+# a tiny self-describing stub, and 01_build_peptide_features.py writes nothing.
+_base_: base.yaml
+
+peptide_featurization:
+  method: molecular_graph
+
+output_files:
+  peptide_features_filename: peptide_features_molgraph.csv   # never written
+  peptide_feature_scaler_filename: peptide_feature_scaler_molgraph.json

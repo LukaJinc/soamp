@@ -1,0 +1,16 @@
+# Cross-validation counterpart to exp_molgraph_vocab.yaml: same featurization grid cell,
+# run through pipeline/train_cv.py's 5-fold CV (5 epochs per fold) instead of
+# pipeline/train.py's single held-out split.
+_base_: exp_molgraph_vocab.yaml
+
+exp_id: molgraph_vocab_cv
+
+loop:
+  epochs: 5
+
+wandb_group: featurization_grid_cv_v2
+wandb_tags:
+  - molecular_graph
+  - vocab_embedding
+  - attention_fusion_classifier
+  - cv

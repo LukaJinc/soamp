@@ -1,0 +1,26 @@
+# Featurization-grid cell: molecular_graph peptide x vocab_embedding organism.
+# Architecture is held fixed at attention_fusion_classifier across all cells so
+# the comparison isolates the representation, not the model.
+_base_: base.yaml
+
+exp_id: molgraph_vocab_attnfusion
+
+model:
+  architecture: attention_fusion_classifier
+
+# Small trainable GNN (~40k params, model.graph_encoder defaults) trained from
+# scratch on ~12k peptides: weight decay + the encoder's dropout/LayerNorm are
+# the regularisers.
+optim:
+  weight_decay: 1.0e-4
+
+input_files:
+  peptide_features_filename: peptide_features_molgraph.csv
+  peptide_feature_scaler_filename: peptide_feature_scaler_molgraph.json
+  organism_vocab_filename: organism_vocab_vocab_embedding.json
+
+wandb_group: featurization_grid_v1
+wandb_tags:
+  - molecular_graph
+  - vocab_embedding
+  - attention_fusion_classifier

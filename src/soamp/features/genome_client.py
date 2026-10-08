@@ -65,3 +65,24 @@ def fetch_genome_fasta(accession: str, out_path, session: requests.Session | Non
         with open(out_path, "wb") as out_f:
             for name in fasta_names:
                 out_f.write(zf.read(name))
+
+
+def fetch_genome_gff(accession: str, out_path, session: requests.Session | None = None,
+                      timeout: int = 120) -> None:
+    """Downloads one assembly's GFF3 annotation (same Datasets v2 endpoint,
+    `include_annotation_type=GENOME_GFF`) and writes `genomic.gff` to
+    `out_path`. Used to locate the 16S rRNA gene inside the genome FASTA that
+    fetch_genome_fasta already cached -- the endpoint's RNA_FASTA option
+    returns nothing for these assemblies."""
+    session = session or requests.Session()
+    r = session.get(
+        DOWNLOAD_URL.format(accession=accession),
+        params={"include_annotation_type": "GENOME_GFF"}, timeout=timeout, stream=True,
+    )
+    r.raise_for_status()
+    with zipfile.ZipFile(io.BytesIO(r.content)) as zf:
+        gff_names = [n for n in zf.namelist() if n.endswith(".gff")]
+        if not gff_names:
+            raise ValueError(f"no GFF file found in download bundle for {accession!r}")
+        with open(out_path, "wb") as out_f:
+            out_f.write(zf.read(gff_names[0]))

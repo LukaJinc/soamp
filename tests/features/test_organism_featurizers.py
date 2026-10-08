@@ -155,3 +155,63 @@ def test_build_organism_featurizer_dispatches_kmer_composition():
     featurizer = build_organism_featurizer("kmer_composition", k_values=(1, 2))
     assert isinstance(featurizer, KmerOrganismFeaturizer)
     assert featurizer.k_values == (1, 2)
+
+
+def _write_dnabert_table(path, dim=4):
+    import json
+
+    json.dump({
+        "method": "dnabert_s_16s", "embedding_dim": dim,
+        "entries": {
+            "Escherichia coli": {"level": "species", "vector": [1.0] * dim},
+            "Staphylococcus aureus": {"level": "species", "vector": [2.0] * dim},
+            "Bacillus": {"level": "genus", "vector": [3.0] * dim},
+        },
+    }, open(path, "w"))
+
+
+def test_dnabert_s_featurizer_lookup_precedence_and_zero_fallback(tmp_path):
+    from soamp.features.organism_featurizers import DnabertSOrganismFeaturizer
+
+    table = tmp_path / "t.json"
+    _write_dnabert_table(table)
+    f = DnabertSOrganismFeaturizer(embeddings_path=str(table))
+    f.fit(["Escherichia coli", "Bacillus subtilis"])
+    assert f.output_kind == "vector" and f.feature_dim == 4 and f.vocab_size is None
+    assert f.encode("Escherichia coli") == [1.0] * 4          # species-exact
+    assert f.encode("Bacillus subtilis") == [3.0] * 4         # genus fallback
+    assert f.encode("Homo sapiens") == [0.0] * 4              # unknown -> zeros
+
+
+def test_dnabert_s_featurizer_fit_raises_for_unresolvable_organism(tmp_path):
+    from soamp.features.organism_featurizers import DnabertSOrganismFeaturizer, OrganismFeaturizerError
+
+    table = tmp_path / "t.json"
+    _write_dnabert_table(table)
+    with pytest.raises(OrganismFeaturizerError, match="Homo sapiens"):
+        DnabertSOrganismFeaturizer(embeddings_path=str(table)).fit(["Homo sapiens"])
+
+
+def test_dnabert_s_featurizer_missing_table_has_actionable_error(tmp_path):
+    from soamp.features.organism_featurizers import DnabertSOrganismFeaturizer
+
+    with pytest.raises(FileNotFoundError, match="04_embed_organism_16s_dnabert_s"):
+        DnabertSOrganismFeaturizer(embeddings_path=str(tmp_path / "nope.json")).fit([])
+
+
+def test_dnabert_s_artifact_round_trip_and_registry(tmp_path):
+    from soamp.features.organism_featurizers import (
+        DnabertSOrganismFeaturizer,
+        build_organism_featurizer,
+        organism_featurizer_from_artifact,
+    )
+
+    table = tmp_path / "t.json"
+    _write_dnabert_table(table)
+    original = build_organism_featurizer("dnabert_s_16s", embeddings_path=str(table))
+    artifact = original.to_artifact_dict()
+    assert artifact["method"] == "dnabert_s_16s" and artifact["feature_dim"] == 4
+    restored = organism_featurizer_from_artifact(artifact)   # no table file needed
+    assert isinstance(restored, DnabertSOrganismFeaturizer)
+    assert restored.encode("Staphylococcus aureus") == [2.0] * 4
+    assert restored.feature_dim == 4

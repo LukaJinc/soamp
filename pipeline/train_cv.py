@@ -43,7 +43,8 @@ from soamp.engine.cross_validation import (
     summarize_cv_metrics,
     train_and_evaluate_fold,
 )
-from soamp.engine.tracking import build_tracker
+from soamp.engine.tracking import build_tracker, count_parameters
+from soamp.model.factory import build_model
 from soamp.utils.config import load_config
 from soamp.utils.device import resolve_device
 from soamp.utils.logging import configure_logging
@@ -149,6 +150,7 @@ def main() -> None:
             "epochs": CFG.loop.epochs,
             "batch_size": CFG.loop.batch_size,
             "learning_rate": CFG.optim.learning_rate,
+            "weight_decay": CFG.optim.weight_decay,
             "seed": CFG.loop.seed,
             "architecture": CFG.model.architecture,
             **CFG.model.active_kwargs(),
@@ -159,6 +161,13 @@ def main() -> None:
         project="soamp", job_type="kfold_cv", run_name=CFG.exp_id,
         group=CFG.wandb_group, tags=CFG.wandb_tags,
     )
+
+    # Every fold builds the same architecture, so one throwaway instance from
+    # the preview bundle gives the exact trainable-parameter count to log.
+    run.summary["n_parameters"] = count_parameters(build_model(
+        preview_bundle, architecture=CFG.model.architecture,
+        graph_encoder_kwargs=CFG.model.graph_encoder.model_dump(), **CFG.model.active_kwargs(),
+    ))
 
     # Per-epoch curves are x-axis'd by "epoch"; the per-fold summary rows
     # below by "fold" -- separate step metrics so the two don't clash.
@@ -204,8 +213,10 @@ def main() -> None:
             organism_method=organism_method,
             architecture=CFG.model.architecture,
             architecture_kwargs=CFG.model.active_kwargs(),
+            graph_encoder_kwargs=CFG.model.graph_encoder.model_dump(),
             batch_size=CFG.loop.batch_size,
             learning_rate=CFG.optim.learning_rate,
+            weight_decay=CFG.optim.weight_decay,
             class_balancing_mode=CFG.class_balancing.mode,
             class_balancing_fixed_pos_weight=CFG.class_balancing.fixed_pos_weight,
             device=device,

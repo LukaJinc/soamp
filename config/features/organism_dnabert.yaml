@@ -1,0 +1,15 @@
+# Organism side of the featurization grid: frozen DNABERT-S embedding of each
+# organism's 16S rRNA gene (output_kind="vector", 768 dims). Used by
+# pipeline/features/02_build_organism_vocab.py.
+#
+# Needs data/organism_16s_dnabert_s.json (committed) -- built once by
+# pipeline/features/04_embed_organism_16s_dnabert_s.py on Colab. The resulting
+# organism_vocab artifact bakes the vectors in, so training needs neither the
+# model, a GPU, nor network access.
+_base_: base.yaml
+
+organism_featurization:
+  method: dnabert_s_16s
+
+output_files:
+  organism_vocab_filename: organism_vocab_dnabert_s_16s.json

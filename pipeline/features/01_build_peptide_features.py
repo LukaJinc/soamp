@@ -64,6 +64,11 @@ def main() -> None:
         CFG.peptide_featurization.method, **CFG.peptide_featurization.active_kwargs()
     )
     log.info(f"peptide_featurization.method: {CFG.peptide_featurization.method}")
+    if featurizer.input_kind == "graph":
+        # Graphs are a fixed function of each SMILES and are built on the fly
+        # at dataset construction -- there is no feature CSV to write.
+        log.info("molecular_graph: nothing to write (graphs are built from SMILES at train time)")
+        return
     featurizer.fit(unique_peptides)
     feature_rows = featurizer.transform(unique_peptides)
     feature_names = featurizer.feature_names

@@ -195,3 +195,37 @@ def test_artifact_mode_rejects_organism_method_kwargs(tmp_path):
     _write_artifact_fixture(tmp_path)
     with pytest.raises(DatasetFactoryError):
         build_dataset(data_dir=tmp_path, organism_method_kwargs={"unknown_index": 1})
+
+
+def test_from_artifacts_molecular_graph_builds_graph_datasets_without_feature_csv(tmp_path):
+    from soamp.data.graph_batch import GraphBatch
+    from soamp.data.loaders import build_loader
+
+    _write_artifact_fixture(tmp_path)
+    (tmp_path / "peptide_features.csv").unlink()  # graph input has no feature CSV
+    # the fixture's classification rows carry no SMILES -- add them
+    rows = list(csv.DictReader(open(tmp_path / "mic_classification_dataset.csv")))
+    smiles = {"1": GLYCINE, "2": ACETIC_ACID, "3": "CCO"}
+    for r in rows:
+        r["smiles"] = smiles[r["peptide_id"]]
+        r["sequence"] = r["peptide_id"]
+    with open(tmp_path / "mic_classification_dataset.csv", "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    with open(tmp_path / "peptide_feature_scaler.json", "w") as f:
+        json.dump({"method": "molecular_graph", "descriptor_names": [], "mean": [], "scale": []}, f)
+
+    bundle = build_dataset(data_dir=tmp_path)
+    assert bundle.featurization.peptide_input_kind == "graph"
+    assert bundle.featurization.peptide_feature_dim is None
+    assert bundle.featurization.peptide_method == "molecular_graph"
+    assert bundle.featurization.graph_node_dim and bundle.featurization.graph_edge_dim
+    graphs, organisms, labels = next(iter(build_loader(bundle.datasets["fit"], 4)))
+    assert isinstance(graphs, GraphBatch) and graphs.num_graphs == 1
+
+
+def test_from_rows_vector_methods_report_vector_input_kind():
+    bundle = build_dataset(row_groups={"fit": _fit_rows()})
+    assert bundle.featurization.peptide_input_kind == "vector"
+    assert bundle.featurization.graph_node_dim is None

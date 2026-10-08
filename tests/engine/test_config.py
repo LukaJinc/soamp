@@ -128,3 +128,19 @@ def test_featurization_grid_configs(overlay, exp_id, peptide_features, organism_
     assert cfg.input_files.peptide_features_filename == peptide_features
     assert cfg.input_files.organism_vocab_filename == organism_vocab
     assert cfg.wandb_group == "featurization_grid_v1"
+
+
+def test_graph_encoder_defaults_and_extra_key_rejected():
+    cfg = TrainConfig.model_validate({})
+    assert cfg.model.graph_encoder.model_dump() == {
+        "hidden_dim": 64, "num_layers": 4, "out_dim": 64, "dropout": 0.1,
+    }
+    with pytest.raises(ValidationError):
+        TrainConfig.model_validate({"model": {"graph_encoder": {"bogus": 1}}})
+
+
+@pytest.mark.parametrize("cell", ["molgraph_vocab", "molgraph_kmer", "molgraph_dnabert"])
+def test_molgraph_cells_load_and_use_weight_decay(cell):
+    cfg = load_config(f"config/train/cv_{cell}.yaml", TrainConfig)
+    assert cfg.exp_id == f"{cell}_cv" and cfg.optim.weight_decay == 1e-4
+    assert cfg.input_files.peptide_feature_scaler_filename == "peptide_feature_scaler_molgraph.json"

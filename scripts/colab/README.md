@@ -1,12 +1,15 @@
 # Running soamp on Google Colab
 
-Three notebooks:
+Four notebooks:
 
 | Notebook | What it does |
 |---|---|
-| `01_smoke_overfit.ipynb` | Builds all four (peptide × organism) featurizations, checks each produces the dimensions it claims and forwards through `attention_fusion_classifier`, then overfits ~256 rows per cell and asserts the loss reaches zero. Gate for notebooks 02 and 03. |
+| `01_smoke_overfit.ipynb` | Builds every (peptide × organism) featurization in the 3×3 grid (the `dnabert_s_16s` ones only once `data/organism_16s_dnabert_s.json` is committed), checks each produces the dimensions it claims and forwards through `attention_fusion_classifier`, then overfits ~256 rows per cell and asserts the loss reaches zero. Gate for notebooks 02 and 03. |
+| `04_embed_organisms.ipynb` | **One-off.** Embeds each organism's 16S rRNA gene with frozen DNABERT-S on a Colab GPU (needs `transformers<5`, installed in that runtime only) and downloads the small table `data/organism_16s_dnabert_s.json` to commit. Only re-run when `config/organism_genomes/organism_genome_accessions.csv` gains organisms. |
 | `02_run_experiments.ipynb` | Builds the PeptideCLM feature artifact on the GPU (cached to Drive), then runs the four `config/train/exp_*.yaml` cells through `pipeline/train.py` (single held-out train/val/test split) and collects results from wandb. |
-| `03_run_cv_experiments.ipynb` | CV counterpart to 02: builds/reuses the same PeptideCLM feature artifact, then runs the four `config/train/cv_*.yaml` cells through `pipeline/train_cv.py` (5-fold CV over the train peptides of the committed `data/peptide_split.csv` — no checkpoints, `test` never touched; per-epoch fit/val loss curves are logged to wandb and plotted in the notebook) and collects results from wandb. |
+| `03_run_cv_experiments.ipynb` | CV counterpart to 02: builds/reuses the same PeptideCLM feature artifact, then runs the `config/train/cv_*.yaml` cells you select (any subset of the 3×3 grid) through `pipeline/train_cv.py` (5-fold CV over the train peptides of the committed `data/peptide_split.csv` — no checkpoints, `test` never touched; per-epoch fit/val loss curves are logged to wandb and plotted in the notebook) and collects results from wandb. |
+
+In `03_run_cv_experiments.ipynb`, **section 0 is the only cell to edit**: set `PEPTIDE` / `ORGANISM` (cross product), `EXCLUDE`, or `ONLY` to pick which `config/train/cv_<peptide>_<organism>.yaml` cells run; the genome download, PeptideCLM featurization, artifact checks, comparison, plots and Drive copy all adapt to the selection.
 
 Run 01 first as a gate; 02 and 03 are independent of each other (each rebuilds/reuses its own PeptideCLM cache) and can run in either order.
 
@@ -31,7 +34,7 @@ Set these under the key icon in the left sidebar, with notebook access enabled:
 
 ## Experiment grid
 
-`attention_fusion_classifier` is held fixed across all four cells so the
+`attention_fusion_classifier` is held fixed across all cells so the
 comparison isolates the representation. `BaselineClassifier` projects only the
 organism side and feeds peptide features in raw, so a 768-dim PeptideCLM vector
 concatenated with an 8-dim organism embedding would be ~99% peptide — not a
@@ -43,11 +46,19 @@ comparison worth running against the 13-dim RDKit cell.
 | `rdkit_kmer_attnfusion` | `rdkit_descriptors` (13d) | `kmer_composition` (340d vector) |
 | `peptideclm_vocab_attnfusion` | `peptideclm_embedding` (768d) | `vocab_embedding` (index) |
 | `peptideclm_kmer_attnfusion` | `peptideclm_embedding` (768d) | `kmer_composition` (340d vector) |
+| `molgraph_{vocab,kmer,dnabert}_attnfusion` | `molecular_graph` (small trainable GINE GNN, ~40k params, → 64d) | vocab / k-mer / DNABERT-S |
+| `{rdkit,peptideclm}_dnabert_attnfusion` | RDKit / PeptideCLM | `dnabert_s_16s` (768d vector) |
 
-All four land in wandb project `soamp`, group `featurization_grid_v1`.
+The grid is 3×3: peptide {`rdkit_descriptors` 0D, `peptideclm_embedding` 1D, `molecular_graph` 2D} ×
+organism {`vocab_embedding`, `kmer_composition`, `dnabert_s_16s`}. `molecular_graph` is the only
+peptide method trained end to end (the GNN lives in the model; its hyperparameters are
+`model.graph_encoder` in the train config). `dnabert_s_16s` is a frozen embedding of the
+organism's 16S rRNA gene, read from a committed table (see notebook 04).
+
+All cells land in wandb project `soamp`, group `featurization_grid_v1`.
 
 The CV counterpart (`03_run_cv_experiments.ipynb`, `config/train/cv_*.yaml`,
-`exp_id`s `{rdkit,peptideclm}_{vocab,kmer}_cv`) runs the same four cells
+`exp_id`s `<peptide>_<organism>_cv`) runs the same cells
 through `pipeline/train_cv.py`'s 5-fold CV instead, logging to a separate
 group, `featurization_grid_cv_v2` — cross-fold `{fit,val}_<metric>_{mean,std}`
 summary keys, no `test_*` keys (CV never touches test) and no checkpoints
@@ -55,13 +66,15 @@ summary keys, no `test_*` keys (CV never touches test) and no checkpoints
 
 ## Feature artifacts
 
-Each cell reads method-suffixed filenames, so all four coexist in `data/`:
+Each cell reads method-suffixed filenames, so all of them coexist in `data/`:
 
 | artifact | committed? | built by |
 |---|---|---|
 | `peptide_features_rdkit.csv` + `peptide_feature_scaler_rdkit.json` | yes (1.4 MB) | `features/01`+`03 --config config/features/peptide_rdkit.yaml` |
 | `organism_vocab_vocab_embedding.json` | yes (184 B) | `features/02 --config config/features/organism_vocab.yaml` |
 | `organism_vocab_kmer_composition.json` | yes (28 KB) | `features/02 --config config/features/organism_kmer.yaml` |
+| `peptide_feature_scaler_molgraph.json` | yes (stub, 300 B) | `features/03 --config config/features/peptide_molgraph.yaml` (no feature CSV: graphs are built from SMILES) |
+| `organism_16s_dnabert_s.json` → `organism_vocab_dnabert_s_16s.json` | yes (once built) | notebook `04_embed_organisms.ipynb`, then `features/02 --config config/features/organism_dnabert.yaml` |
 | `peptide_features_peptideclm.csv` + its scaler | **no** (~190 MB) | `features/01`+`03 --config config/features/peptide_peptideclm.yaml` |
 
 The PeptideCLM artifact exceeds GitHub's per-file limit, so it is gitignored and

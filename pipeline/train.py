@@ -33,15 +33,15 @@ import argparse
 
 import torch
 from dotenv import load_dotenv
-from torch.utils.data import DataLoader
 
 from soamp.data.factory import build_dataset
+from soamp.data.loaders import build_loader
 from soamp.data.torch_dataset import LABEL_TO_INT
 from soamp.engine.checkpointer import Checkpointer, CheckpointMetadata
 from soamp.engine.class_balancing import resolve_pos_weight
 from soamp.engine.config import TrainConfig
 from soamp.engine.metrics import compute_binary_metrics, compute_metrics_by_organism
-from soamp.engine.tracking import build_tracker, watch_model
+from soamp.engine.tracking import build_tracker, count_parameters, watch_model
 from soamp.engine.trainer import Trainer
 from soamp.model.factory import build_model
 from soamp.utils.config import load_config
@@ -80,20 +80,15 @@ def main() -> None:
     fit_ds, val_ds, test_ds = bundle.datasets["fit"], bundle.datasets["val"], bundle.datasets["test"]
     log.info(f"fit={len(fit_ds)} val={len(val_ds)} test={len(test_ds)} rows")
 
-    fit_loader = DataLoader(
-        fit_ds, batch_size=CFG.loop.batch_size, shuffle=True,
-        num_workers=CFG.loop.num_dataloader_workers,
-    )
-    val_loader = DataLoader(
-        val_ds, batch_size=CFG.loop.batch_size, num_workers=CFG.loop.num_dataloader_workers,
-    )
-    test_loader = DataLoader(
-        test_ds, batch_size=CFG.loop.batch_size, num_workers=CFG.loop.num_dataloader_workers,
-    )
+    workers = CFG.loop.num_dataloader_workers
+    fit_loader = build_loader(fit_ds, CFG.loop.batch_size, shuffle=True, num_workers=workers)
+    val_loader = build_loader(val_ds, CFG.loop.batch_size, num_workers=workers)
+    test_loader = build_loader(test_ds, CFG.loop.batch_size, num_workers=workers)
 
     model = build_model(
         bundle,
         architecture=CFG.model.architecture,
+        graph_encoder_kwargs=CFG.model.graph_encoder.model_dump(),
         **CFG.model.active_kwargs(),
     )
 
@@ -111,6 +106,7 @@ def main() -> None:
         project="soamp", job_type="train", run_name=CFG.exp_id,
         group=CFG.wandb_group, tags=CFG.wandb_tags,
     )
+    run.summary["n_parameters"] = count_parameters(model)
     watch_model(model)
 
     fit_labels = [LABEL_TO_INT[r["label"]] for r in fit_ds.rows]

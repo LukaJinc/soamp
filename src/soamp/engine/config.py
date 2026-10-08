@@ -49,10 +49,23 @@ class AttentionFusionClassifierConfig(BaseModel):
     hidden_dims: list[int] = [64, 32]
 
 
+class GraphEncoderConfig(BaseModel):
+    """GINEncoder hyperparameters; only used when the peptide featurization is
+    `molecular_graph` (ignored otherwise)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    hidden_dim: int = 64
+    num_layers: int = 4
+    out_dim: int = 64
+    dropout: float = 0.1
+
+
 class ModelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     architecture: str = "baseline_classifier"
+    graph_encoder: GraphEncoderConfig = GraphEncoderConfig()
     baseline_classifier: BaselineClassifierConfig = BaselineClassifierConfig()
     attention_fusion_classifier: AttentionFusionClassifierConfig = AttentionFusionClassifierConfig()
 

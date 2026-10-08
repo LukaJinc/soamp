@@ -26,6 +26,7 @@ import json
 from dotenv import load_dotenv
 
 from soamp.features.config import FeaturesConfig
+from soamp.features.molgraph import EDGE_DIM, NODE_DIM
 from soamp.features.scaling import fit_scaler
 from soamp.utils.config import load_config
 from soamp.utils.logging import configure_logging
@@ -53,6 +54,21 @@ LOG_PATH = (
 
 def main() -> None:
     log = configure_logging("features.03_fit_peptide_scaler")
+
+    if CFG.peptide_featurization.method == "molecular_graph":
+        # Nothing to scale: write the self-describing stub that tells
+        # build_dataset / train_cv which peptide method this run uses.
+        stub = {
+            "method": "molecular_graph", "descriptor_names": [], "mean": [], "scale": [],
+            "node_dim": NODE_DIM, "edge_dim": EDGE_DIM,
+            "fitted_on": "n/a (fixed function of the SMILES; the GNN is trained in the model)",
+        }
+        CFG.paths.data_dir.mkdir(parents=True, exist_ok=True)
+        with open(OUT_JSON, "w") as f:
+            json.dump(stub, f, indent=2)
+            f.write("\n")
+        log.info(f"Wrote graph stub {OUT_JSON}")
+        return
 
     with open(CLASSIFICATION_CSV, newline="") as f:
         train_peptide_ids = {

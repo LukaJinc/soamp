@@ -9,8 +9,9 @@ soamp.features.scaling.fit_scaler/apply_scaler and
 soamp.features.peptide.index_feature_rows_by_peptide_id pipeline regardless
 of which method produced them.
 """
-from typing import Protocol
+from typing import Literal, Protocol
 
+from soamp.features.molgraph import EDGE_DIM, NODE_DIM, smiles_to_graph
 from soamp.features.peptide import DESCRIPTOR_NAMES, build_peptide_feature_rows
 
 
@@ -19,6 +20,11 @@ class PeptideFeaturizerError(ValueError):
 
 
 class PeptideFeaturizer(Protocol):
+    # "vector": transform() rows are named floats (flow through the scaler /
+    # CSV-artifact pipeline). "graph": rows carry a `graph` (MolGraph) and the
+    # model owns a trainable encoder -- see MolecularGraphFeaturizer. Mirrors
+    # the organism side's `output_kind` contract.
+    input_kind: Literal["vector", "graph"]
     feature_names: list[str]
 
     def fit(self, fit_unique_peptides: list[dict]) -> None: ...
@@ -32,6 +38,8 @@ class PeptideFeaturizer(Protocol):
 class RDKitDescriptorFeaturizer:
     """Thin adapter over soamp.features.peptide's existing pure functions --
     no new RDKit logic here."""
+
+    input_kind: Literal["vector"] = "vector"
 
     def __init__(self, descriptor_names: list[str] = DESCRIPTOR_NAMES) -> None:
         self.feature_names = list(descriptor_names)
@@ -70,6 +78,7 @@ class PeptideCLMFeaturizer:
     call) sees no behavior change.
     """
 
+    input_kind: Literal["vector"] = "vector"
     HIDDEN_SIZE = 768
 
     def __init__(
@@ -155,9 +164,35 @@ class PeptideCLMFeaturizer:
         ]
 
 
+class MolecularGraphFeaturizer:
+    """Molecular graph (atoms = nodes, bonds = edges) per peptide, from the
+    SMILES via soamp.features.molgraph. Nothing is fitted or scaled: the graph
+    is a fixed function of the SMILES, and the learned part (a GNN) lives in
+    the model (soamp.model.graph_encoder), trained end to end.
+    `feature_names` is empty because there is no named-float vector."""
+
+    input_kind: Literal["graph"] = "graph"
+    node_dim = NODE_DIM
+    edge_dim = EDGE_DIM
+
+    def __init__(self) -> None:
+        self.feature_names: list[str] = []
+
+    def fit(self, fit_unique_peptides: list[dict]) -> None:
+        pass
+
+    def transform(self, unique_peptides: list[dict]) -> list[dict]:
+        return [
+            {"peptide_id": p["peptide_id"], "graph": smiles_to_graph(p["smiles"])}
+            for p in unique_peptides
+        ]
+
+
 def build_peptide_featurizer(method: str, **method_kwargs) -> PeptideFeaturizer:
     if method == "rdkit_descriptors":
         return RDKitDescriptorFeaturizer(**method_kwargs)
     if method == "peptideclm_embedding":
         return PeptideCLMFeaturizer(**method_kwargs)
+    if method == "molecular_graph":
+        return MolecularGraphFeaturizer(**method_kwargs)
     raise PeptideFeaturizerError(f"unknown peptide featurization method: {method!r}")

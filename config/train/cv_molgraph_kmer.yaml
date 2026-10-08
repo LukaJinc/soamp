@@ -1,0 +1,16 @@
+# Cross-validation counterpart to exp_molgraph_kmer.yaml: same featurization grid cell,
+# run through pipeline/train_cv.py's 5-fold CV (5 epochs per fold) instead of
+# pipeline/train.py's single held-out split.
+_base_: exp_molgraph_kmer.yaml
+
+exp_id: molgraph_kmer_cv
+
+loop:
+  epochs: 5
+
+wandb_group: featurization_grid_cv_v2
+wandb_tags:
+  - molecular_graph
+  - kmer_composition
+  - attention_fusion_classifier
+  - cv

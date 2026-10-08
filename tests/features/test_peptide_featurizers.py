@@ -138,3 +138,22 @@ def test_peptideclm_featurizer_transform_returns_rows_in_requested_order():
 
         result = featurizer.transform([_UNIQUE_PEPTIDES[1], _UNIQUE_PEPTIDES[0]])  # "2" then "1"
     assert [row["peptide_id"] for row in result] == ["2", "1"]
+
+
+def test_molecular_graph_featurizer_registry_and_transform():
+    from soamp.features.molgraph import EDGE_DIM, NODE_DIM
+    from soamp.features.peptide_featurizers import MolecularGraphFeaturizer, build_peptide_featurizer
+
+    featurizer = build_peptide_featurizer("molecular_graph")
+    assert isinstance(featurizer, MolecularGraphFeaturizer)
+    assert featurizer.input_kind == "graph" and featurizer.feature_names == []
+    assert (featurizer.node_dim, featurizer.edge_dim) == (NODE_DIM, EDGE_DIM)
+    rows = featurizer.transform([{"peptide_id": "1", "smiles": "NCC(=O)O"}])
+    assert rows[0]["peptide_id"] == "1" and rows[0]["graph"].num_nodes == 5
+
+
+def test_vector_featurizers_declare_vector_input_kind():
+    from soamp.features.peptide_featurizers import PeptideCLMFeaturizer, RDKitDescriptorFeaturizer
+
+    assert RDKitDescriptorFeaturizer().input_kind == "vector"
+    assert PeptideCLMFeaturizer().input_kind == "vector"
