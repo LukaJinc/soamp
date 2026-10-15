@@ -1,0 +1,4 @@
+=== Features step 2: organism vocab ===
+Method: dnabert_s_16s
+Unique organisms in dataset: 3
+Wrote /Users/lukajin/PycharmProjects/soamp/data/organism_vocab_dnabert_s_16s.json
