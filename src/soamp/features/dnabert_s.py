@@ -5,13 +5,33 @@ plain masked-LM DNA embedding whose cosine similarity is ~0.97+ across all
 taxonomic ranks).
 
 Run ONLY from pipeline/features/04_embed_organism_16s_dnabert_s.py, on an
-environment with `transformers<5`, `einops` and (for GPU speed) `triton`:
-the checkpoint's remote modeling code does not load under transformers 5
-(hard `triton` import, `config.pad_token_id`, meta-device init). Training
-never imports this module -- it reads the small committed embedding table the
-script writes.
+environment with `transformers<5` and `einops`: the checkpoint's remote
+modeling code does not load under transformers 5 (hard `triton` import,
+`config.pad_token_id`, meta-device init). Training never imports this module
+-- it reads the small committed embedding table the script writes.
+
+The remote code's bundled Triton flash-attention kernel targets triton 2.0 and
+crashes on current runtimes (`tl.dot() got an unexpected keyword argument
+'trans_b'`), so `_disable_triton_attention` switches the model to the
+pure-PyTorch attention path the same file already ships (same maths, CPU or
+GPU, no triton needed).
 """
+import sys
+
 import numpy as np
+
+
+def _disable_triton_attention(model) -> None:
+    """bert_layers.py's BertUnpadSelfAttention computes attention in PyTorch
+    when the module-level `flash_attn_qkvpacked_func` is None (it reads that
+    global at call time), so patching it routes every layer to the fallback."""
+    module = sys.modules[type(model.encoder.layer[0].attention.self).__module__]
+    if not hasattr(module, "flash_attn_qkvpacked_func"):
+        raise RuntimeError(
+            f"{module.__name__} has no `flash_attn_qkvpacked_func`; the DNABERT-S "
+            "remote code changed -- check the pinned organism_16s_embedding.revision."
+        )
+    module.flash_attn_qkvpacked_func = None
 
 
 def embed_sequences(
@@ -34,6 +54,7 @@ def embed_sequences(
     resolved = resolve_device(device)
     tokenizer = AutoTokenizer.from_pretrained(checkpoint, revision=revision, trust_remote_code=True)
     model = AutoModel.from_pretrained(checkpoint, revision=revision, trust_remote_code=True)
+    _disable_triton_attention(model)
     model.to(resolved).eval()
 
     out = []
