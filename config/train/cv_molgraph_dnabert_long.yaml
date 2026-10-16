@@ -1,0 +1,21 @@
+# One long cross-validation run of cv_molgraph_dnabert.yaml: trains every fold for up to
+# 100 epochs and snapshots fit/val metrics + held-out predictions every 5 epochs,
+# so notebook 06 can compare variants "as if" each had been trained for N epochs
+# (constant LR, so the model at epoch N is the model an N-epoch run would give).
+_base_: cv_molgraph_dnabert.yaml
+
+exp_id: molgraph_dnabert_cv_long
+
+loop:
+  epochs: 100
+
+cv:
+  snapshot_every_n_epochs: 5
+
+wandb_group: featurization_grid_cv_v3
+wandb_tags:
+  - molecular_graph
+  - dnabert_s_16s
+  - attention_fusion_classifier
+  - cv
+  - long

@@ -30,6 +30,8 @@ artifact, cross-fold mean/std summary, and a cv_results Artifact.
 import argparse
 import csv
 import json
+import tempfile
+from pathlib import Path
 
 import pandas as pd
 import wandb
@@ -92,6 +94,7 @@ def main() -> None:
     LOG_PATH = CFG.paths.reports_dir / f"train_cv_{CFG.exp_id}_log.txt"
     RESULTS_CSV_PATH = CFG.paths.reports_dir / f"cv_results_{CFG.exp_id}.csv"
     LOSS_CURVES_CSV_PATH = CFG.paths.reports_dir / f"cv_loss_curves_{CFG.exp_id}.csv"
+    SNAPSHOTS_CSV_PATH = CFG.paths.reports_dir / f"cv_snapshots_{CFG.exp_id}.csv"
 
     log = configure_logging("train_cv")
     log.info(f"Loaded config: {args.config} (exp_id={CFG.exp_id})")
@@ -155,6 +158,7 @@ def main() -> None:
             "architecture": CFG.model.architecture,
             **CFG.model.active_kwargs(),
             "class_balancing_mode": CFG.class_balancing.mode,
+            "snapshot_every_n_epochs": CFG.cv.snapshot_every_n_epochs,
             "device": str(device),
             "fold_generation": FOLD_GENERATION_METADATA,
         },
@@ -189,6 +193,8 @@ def main() -> None:
     fold_results = []
     fold_metrics_rows = []
     loss_curve_rows = []
+    snapshot_rows = []
+    snapshot_prediction_frames = []
     for fold_id in fold_ids:
         row_groups = {
             "fit": [r for r in train_rows if r["fold_id"] != fold_id],
@@ -202,6 +208,15 @@ def main() -> None:
                 f"fold/{fold_id}/val_loss": entry["val_loss"],
                 f"fold/{fold_id}/val_auroc": entry["val_auroc"],
             })
+
+        def log_snapshot(snapshot: dict, fold_id=fold_id) -> None:
+            for eval_group, metrics in snapshot["metrics"].items():
+                snapshot_rows.append({
+                    "val_fold_id": fold_id, "epoch": snapshot["epoch"], "eval_group": eval_group, **metrics,
+                })
+            snapshot_prediction_frames.append(
+                snapshot["val_predictions"].assign(val_fold_id=fold_id, epoch=snapshot["epoch"])
+            )
 
         metrics_by_group, results_df = train_and_evaluate_fold(
             row_groups,
@@ -222,6 +237,8 @@ def main() -> None:
             device=device,
             watch=True,
             on_epoch_end=log_epoch,
+            snapshot_every_n_epochs=CFG.cv.snapshot_every_n_epochs,
+            on_snapshot=log_snapshot if CFG.cv.snapshot_every_n_epochs else None,
         )
         fit_m, val_m = metrics_by_group["fit"], metrics_by_group["val"]
         log.info(
@@ -258,6 +275,18 @@ def main() -> None:
     results_artifact = wandb.Artifact(name="cv_results", type="results")
     results_artifact.add(wandb.Table(dataframe=cv_results_df), "cv_results")
     results_artifact.add(wandb.Table(dataframe=loss_curves_df), "cv_loss_curves")
+    snapshots_df = pd.DataFrame(snapshot_rows)
+    snapshot_predictions_df = (
+        pd.concat(snapshot_prediction_frames, ignore_index=True) if snapshot_prediction_frames else pd.DataFrame()
+    )
+    if not snapshots_df.empty:
+        snapshots_df.to_csv(SNAPSHOTS_CSV_PATH, index=False)
+        results_artifact.add(wandb.Table(dataframe=snapshots_df), "cv_snapshots")
+        # A gzipped CSV file, not a wandb Table: Tables reload every column as
+        # a string, and this one is ~N snapshots x all held-out rows.
+        predictions_path = Path(tempfile.mkdtemp()) / "cv_val_predictions.csv.gz"
+        snapshot_predictions_df.to_csv(predictions_path, index=False)
+        results_artifact.add_file(str(predictions_path), name="cv_val_predictions.csv.gz")
     logged_results_artifact = run.log_artifact(results_artifact)
     logged_results_artifact.wait()  # block until server-side commit, so the round-trip
                                      # fetch right below doesn't race the async upload
@@ -281,6 +310,8 @@ def main() -> None:
         f"folds: {fold_ids}",
         f"cv_results_df: {RESULTS_CSV_PATH} ({len(cv_results_df)} rows)",
         f"loss curves: {LOSS_CURVES_CSV_PATH} ({len(loss_curves_df)} rows)",
+        f"snapshots: {len(snapshots_df)} rows, {len(snapshot_predictions_df)} held-out predictions"
+        f" (every {CFG.cv.snapshot_every_n_epochs} epochs)" if CFG.cv.snapshot_every_n_epochs else "snapshots: off",
         f"mean +/- std across folds:\n{summary_df}",
     ]
     with open(LOG_PATH, "w") as f:

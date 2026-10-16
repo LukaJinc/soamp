@@ -144,3 +144,21 @@ def test_molgraph_cells_load_and_use_weight_decay(cell):
     cfg = load_config(f"config/train/cv_{cell}.yaml", TrainConfig)
     assert cfg.exp_id == f"{cell}_cv" and cfg.optim.weight_decay == 1e-4
     assert cfg.input_files.peptide_feature_scaler_filename == "peptide_feature_scaler_molgraph.json"
+
+
+def test_cv_snapshot_every_n_epochs_defaults_off_and_rejects_zero():
+    assert TrainConfig().cv.snapshot_every_n_epochs is None
+    assert TrainConfig.model_validate({"cv": {"snapshot_every_n_epochs": 5}}).cv.snapshot_every_n_epochs == 5
+    with pytest.raises(ValidationError):
+        TrainConfig.model_validate({"cv": {"snapshot_every_n_epochs": 0}})
+
+
+@pytest.mark.parametrize("peptide", ["molgraph", "peptideclm"])
+@pytest.mark.parametrize("organism", ["vocab", "dnabert"])
+def test_long_cv_configs_snapshot_and_keep_their_base_cell(peptide, organism):
+    cfg = load_config(f"config/train/cv_{peptide}_{organism}_long.yaml", TrainConfig)
+    base = load_config(f"config/train/cv_{peptide}_{organism}.yaml", TrainConfig)
+    assert cfg.exp_id == f"{peptide}_{organism}_cv_long"
+    assert cfg.loop.epochs == 100 and cfg.cv.snapshot_every_n_epochs == 5
+    assert cfg.wandb_group == "featurization_grid_cv_v3"
+    assert cfg.input_files == base.input_files and cfg.model == base.model

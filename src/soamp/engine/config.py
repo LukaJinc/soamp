@@ -156,6 +156,17 @@ class CVConfig(BaseModel):
     # pipeline/splitting/01_build_peptide_split.py (soamp.engine.cross_validation
     # reads it by peptide_id -- see that module's docstring).
     folds_csv_filename: str = "peptide_split.csv"
+    # None = off. N = after epochs N, 2N, ... (and the last epoch) log fit/val
+    # metrics and the held-out fold's predictions, so one long run can be
+    # analyzed "as if" trained for each of those epoch budgets.
+    snapshot_every_n_epochs: int | None = None
+
+    @field_validator("snapshot_every_n_epochs", mode="after")
+    @classmethod
+    def _snapshot_must_be_positive(cls, v: int | None) -> int | None:
+        if v is not None and v < 1:
+            raise ValueError(f"snapshot_every_n_epochs must be >= 1 or null, got {v}")
+        return v
 
 
 class TrainConfig(BaseModel):

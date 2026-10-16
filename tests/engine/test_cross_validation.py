@@ -195,6 +195,59 @@ def test_train_and_evaluate_fold_forwards_peptide_and_organism_method_kwargs():
     assert calls[0]["organism_method_kwargs"] == organism_kwargs
 
 
+def _run_with_snapshots(epochs, every, seed=42):
+    rows = _make_peptide_rows(40)
+    row_groups = {"fit": rows[:30], "val": rows[30:]}
+    snapshots = []
+    metrics_by_group, results_df = train_and_evaluate_fold(
+        row_groups, epochs=epochs, seed=seed, peptide_method="rdkit_descriptors",
+        organism_method="vocab_embedding", architecture="baseline_classifier", device="cpu",
+        snapshot_every_n_epochs=every, on_snapshot=snapshots.append,
+    )
+    return rows, snapshots, metrics_by_group, results_df
+
+
+def test_snapshots_fire_every_n_epochs_and_on_the_last_epoch():
+    _, snapshots, _, _ = _run_with_snapshots(epochs=5, every=2)
+    assert [s["epoch"] for s in snapshots] == [2, 4, 5]
+
+
+def test_snapshot_payload_has_fit_and_val_metrics_and_val_only_predictions():
+    rows, snapshots, _, _ = _run_with_snapshots(epochs=2, every=1)
+    snap = snapshots[-1]
+    assert set(snap["metrics"]) == {"fit", "val"}
+    for metrics in snap["metrics"].values():
+        assert {"accuracy", "f1", "precision", "recall", "auroc", "loss"} <= set(metrics)
+        assert np.isfinite(metrics["loss"])
+    preds = snap["val_predictions"]
+    assert list(preds["peptide_id"]) == [r["peptide_id"] for r in rows[30:]]
+    assert {"organism", "has_noncanonical", "true_label_int", "logit"} <= set(preds.columns)
+
+
+def test_snapshots_do_not_change_training_or_final_results():
+    _, _, _, with_snapshots = _run_with_snapshots(epochs=3, every=1)
+    _, _, _, without = _run_with_snapshots(epochs=3, every=None)
+    np.testing.assert_allclose(with_snapshots["logit"].to_numpy(), without["logit"].to_numpy())
+
+
+def test_final_snapshot_matches_returned_val_metrics():
+    _, snapshots, metrics_by_group, _ = _run_with_snapshots(epochs=3, every=10)
+    assert [s["epoch"] for s in snapshots] == [3]
+    for key in ("accuracy", "f1", "precision", "recall", "auroc"):
+        assert snapshots[0]["metrics"]["val"][key] == pytest.approx(metrics_by_group["val"][key])
+
+
+def test_snapshots_require_fit_and_val_groups():
+    rows = _make_peptide_rows(20)
+    with pytest.raises(ValueError, match="'fit' and a 'val'"):
+        train_and_evaluate_fold(
+            {"fit": rows}, eval_groups=("fit",), epochs=1, seed=42,
+            peptide_method="rdkit_descriptors", organism_method="vocab_embedding",
+            architecture="baseline_classifier", device="cpu",
+            snapshot_every_n_epochs=1, on_snapshot=lambda s: None,
+        )
+
+
 def test_summarize_cv_metrics_computes_mean_and_std_per_eval_group():
     fold_metrics_rows = [
         {"val_fold_id": 0, "eval_group": "fit", "accuracy": 0.8, "f1": 0.7},
