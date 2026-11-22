@@ -82,6 +82,7 @@ class Experiment:
     config_path: Path
     exp_id: str
     results_csv: Path  # reports/cv_results_<exp_id>.csv, written by train_cv.py
+    wandb_group: str | None = None
 
 
 def resolve_config_paths(spec: RunSpec, repo_root: Path = REPO_ROOT) -> list[Path]:
@@ -107,14 +108,16 @@ def describe_experiment(config_path: Path) -> Experiment:
         config_path=config_path,
         exp_id=cfg.exp_id,
         results_csv=cfg.paths.reports_dir / f"cv_results_{cfg.exp_id}.csv",
+        wandb_group=cfg.wandb_group,
     )
 
 
-def pending_experiments(experiments: list[Experiment]) -> list[Experiment]:
-    """Skip-if-done: train_cv.py has no resume, so a finished cell is one whose
-    results CSV already exists. (It is written before the wandb upload, so
-    treat it as "trained", not "uploaded".)"""
-    return [e for e in experiments if not e.results_csv.is_file()]
+def pending_experiments(experiments: list[Experiment], finished: frozenset[str] | set[str] = frozenset()) -> list[Experiment]:
+    """Skip-if-done: train_cv.py has no resume. A cell is done if its results CSV exists
+    locally (written before the wandb upload, so "trained", not "uploaded") or W&B already
+    has a *finished* run of that name (`finished`, see soamp.runs.wandb_state) -- the latter
+    is what makes a relaunch on a fresh instance idempotent."""
+    return [e for e in experiments if not e.results_csv.is_file() and e.exp_id not in finished]
 
 
 def required_artifacts_missing(spec: RunSpec, repo_root: Path = REPO_ROOT) -> list[Path]:

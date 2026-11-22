@@ -4,6 +4,8 @@
 # job ends: success, failure, timeout, or this script being killed (EXIT trap).
 #
 # usage: remote_main.sh <spec.yaml> <max_hours> <grace_seconds>
+# exit codes: 10 setup failed, 11 GPU present but unusable, 12 data artifact fetch failed, 124 timeout,
+#             else the runner's (1 = some cell failed, 2 = required artifact missing, 3 = prepare step failed)
 #
 # SKELETON: unverified on a real instance. First smoke test must confirm
 # CONTAINER_ID / CONTAINER_API_KEY exist on the chosen image; fallback is
@@ -17,15 +19,24 @@ mkdir -p reports
 
 # SSH sessions don't inherit the container env; PID 1 does. Load the vast
 # identity vars from there if missing (verified on a real instance).
-for v in CONTAINER_ID CONTAINER_API_KEY WANDB_API_KEY SOAMP_GIT_SHA; do
+for v in CONTAINER_ID CONTAINER_API_KEY WANDB_API_KEY WANDB_ENTITY SOAMP_GIT_SHA SOAMP_EXPERIMENT SOAMP_SHARD SOAMP_DATA_ARTIFACT; do
   if [ -z "${!v:-}" ]; then
     val=$(tr '\0' '\n' </proc/1/environ | sed -n "s/^$v=//p" | head -1)
     [ -n "$val" ] && export "$v=$val"
   fi
 done
 
+# A destroyed instance leaves nothing behind: record rc, per-cell status and the log tail in W&B first.
+# Needs only stdlib + wandb, so it still works when the venv setup failed (rc=10).
+upload_status() {
+  local py=/workspace/venv/bin/python
+  [ -x "$py" ] || py=python3
+  "$py" scripts/exp/upload_status.py "${RC:-1}" >>"$LOG" 2>&1 || echo "[remote_main] status upload failed" >>"$LOG"
+}
+
 destroy() {
   echo "[remote_main] destroying instance in ${GRACE}s (rc=${RC:-unset})" | tee -a "$LOG"
+  upload_status
   sleep "$GRACE"   # grace period: let wandb/log flushes finish
   pip install -q vastai >>"$LOG" 2>&1
   # `yes |`: destroy asks "[y/N]" and aborts without a tty (found in the smoke test).
@@ -76,6 +87,11 @@ if command -v nvidia-smi >/dev/null 2>&1; then
     RC=11; exit "$RC"
   fi
   python -c "import torch; print('[remote_main] torch', torch.__version__, 'cuda', torch.version.cuda, torch.cuda.get_device_name(0))" | tee -a "$LOG"
+fi
+
+# Data comes from a W&B artifact when launched from the cloud (no rsync/SSH there). rc=12: fetch failed.
+if [ -n "${SOAMP_DATA_ARTIFACT:-}" ]; then
+  python scripts/exp/fetch_data.py "$SOAMP_DATA_ARTIFACT" >>"$LOG" 2>&1 || { echo "[remote_main] data fetch failed" | tee -a "$LOG"; RC=12; exit "$RC"; }
 fi
 
 # Hard cap on the whole job; timeout exits 124 -> EXIT trap still destroys.

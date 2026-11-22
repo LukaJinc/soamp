@@ -244,3 +244,7 @@ scripts/EDA/artifacts/
 /artifacts/
 
 presentations/
+
+# generated per-request cells/run specs (scripts/exp/launch.py); shipped in the code bundle, never committed
+config/train/generated/
+config/vast/generated/

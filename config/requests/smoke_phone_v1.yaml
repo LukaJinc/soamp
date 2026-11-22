@@ -1,0 +1,15 @@
+# Phone acceptance test (plan: "Acceptance test A"): 2 tiny cells, ~5 min of GPU, est. < $0.50.
+# Both architectures on RDKit x vocab, 5 epochs, 5-fold CV (default), one seed.
+experiment: smoke_phone_v1
+dataset: dev
+seeds: [42]
+representations:
+  peptide: [rdkit]
+  organism: [vocab]
+architectures:
+  - name: baseline_classifier
+    epochs: 5
+    hparams: {weight_decay: 1.0e-3}
+  - name: attention_fusion_classifier
+    epochs: 5
+    hparams: {projection_dim: 32, hidden_dims: [32, 16], weight_decay: 1.0e-3}

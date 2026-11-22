@@ -1,0 +1,19 @@
+# Example request (see soamp.runs.request). CV is on by default; list = grid axis within
+# ONE architecture; hidden_dims takes a flat list as a single value, list-of-lists as an axis.
+experiment: example_repr_v1
+dataset: dev
+seeds: [42]
+representations:
+  peptide: [rdkit, peptideclm]
+  organism: [vocab]
+architectures:
+  - name: attention_fusion_classifier
+    epochs: 40
+    hparams:
+      projection_dim: 32
+      hidden_dims: [32, 16]
+      weight_decay: [1.0e-3, 1.0e-4]
+  - name: baseline_classifier
+    epochs: 40
+    hparams:
+      weight_decay: 1.0e-3

@@ -8,6 +8,7 @@ destroy path. `--dry-run` resolves and prints the plan without training.
 import argparse
 import json
 import logging
+import os
 import subprocess
 import sys
 import time
@@ -34,7 +35,16 @@ def main() -> int:
 
     spec = load_config(args.spec, RunSpec)
     experiments = [describe_experiment(p) for p in resolve_config_paths(spec)]
-    pending = pending_experiments(experiments)
+    finished: set[str] = set()
+    if os.environ.get("WANDB_API_KEY"):
+        from soamp.runs.wandb_state import finished_run_names
+
+        for group in sorted({e.wandb_group for e in experiments if e.wandb_group}):
+            try:
+                finished |= finished_run_names(group)
+            except Exception as e:  # never block training on a status lookup
+                log.warning("could not read finished runs of group %s from wandb: %s", group, e)
+    pending = pending_experiments(experiments, finished)
     log.info("%d experiments, %d pending", len(experiments), len(pending))
     for e in experiments:
         log.info("  %s %s", "TODO" if e in pending else "done", e.exp_id)
@@ -56,6 +66,8 @@ def main() -> int:
             return 3
 
     status: dict[str, dict] = {}
+    out = REPO_ROOT / "reports" / "vast_run_status.json"
+    out.parent.mkdir(exist_ok=True)
     for e in pending:
         start = time.time()
         # TODO(skeleton): per-cell upload of reports/*<exp_id>* to wandb so
@@ -66,9 +78,8 @@ def main() -> int:
         ).returncode
         status[e.exp_id] = {"returncode": rc, "seconds": round(time.time() - start)}
         log.info("%s finished rc=%d", e.exp_id, rc)
-
-    out = REPO_ROOT / "reports" / "vast_run_status.json"
-    out.write_text(json.dumps(status, indent=2))
+        # written after every cell, so a timeout/kill still leaves the completed cells on record
+        out.write_text(json.dumps(status, indent=2))
     return 1 if any(s["returncode"] for s in status.values()) else 0
 
 

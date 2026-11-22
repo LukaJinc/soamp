@@ -26,5 +26,5 @@ scikit-learn>=1.4
 python-dotenv>=1.0
 transformers>=4.40
 SmilesPE==0.0.3
-wandb>=0.17
+wandb==0.28.2
 requests>=2.31

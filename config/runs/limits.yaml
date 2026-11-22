@@ -1,0 +1,10 @@
+# Hard caps for unattended launches (soamp.runs.budget). Enforced in code by
+# scripts/exp/launch.py; a caller may lower these but never raise them -- raising
+# means editing this file in a reviewed commit. Set 2026-11-23.
+max_cost_per_request_usd: 5.0
+max_concurrent_instances: 2
+max_cost_per_24h_usd: 20.0
+max_cells: 40
+max_hours_per_instance: 3.0
+# Multiplies the estimate: host speed varies and a dropped instance has no resume.
+safety_margin: 1.25

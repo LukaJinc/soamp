@@ -1,0 +1,14 @@
+# Seed timings for pre-launch cost estimates (soamp.runs.budget.CostModel).
+# Wall-clock minutes for one 5-fold CV cell of 100 epochs on a GPU instance.
+# Sources: CLAUDE.md (molecular-graph cell ~14 min on GPU; dev sweep ~6 min per 40-epoch
+# PeptideCLM cell -> ~15 min per 100). RDKit is a guess (7.7k params, no transformer): REPLACE
+# these with medians of past W&B run runtimes after the first real runs.
+minutes_per_100_epochs:
+  rdkit: 5.0
+  peptideclm: 15.0
+  molgraph: 14.0
+default_epochs: 30
+# per instance: boot, uv + torch install, data download, feature build (guess)
+instance_overhead_minutes: 15.0
+# Used only for the pre-offer estimate; the launcher re-estimates with the real offer price.
+assumed_price_per_hour_usd: 0.8
