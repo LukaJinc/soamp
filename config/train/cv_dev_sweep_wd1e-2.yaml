@@ -1,0 +1,26 @@
+# Dev-data sweep cell (weight decay 1e-2) on top of the reference PeptideCLM x vocab_embedding
+# config. Reference = cv_dev_peptideclm_vocab_long.yaml (lr 1e-3, weight decay 0, projection_dim 128,
+# hidden [64, 32]; it overfits: val loss minimum at epoch 3, AUROC/MCC peak at epoch 7).
+# 40 epochs with snapshots every 2 so the early peak is resolved; constant LR, so the model at
+# epoch N equals an N-epoch run.
+_base_: cv_dev_peptideclm_vocab.yaml
+
+exp_id: dev_sweep_wd1e-2
+
+loop:
+  epochs: 40
+
+cv:
+  snapshot_every_n_epochs: 2
+
+optim:
+  weight_decay: 0.01
+
+wandb_group: dev_sweep_v1
+wandb_tags:
+  - dev_dataset
+  - peptideclm_embedding
+  - vocab_embedding
+  - attention_fusion_classifier
+  - cv
+  - sweep

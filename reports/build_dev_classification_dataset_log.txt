@@ -1,0 +1,14 @@
+=== Dev classification dataset ===
+threshold_unit: µg/ml (DBAASP activity, unconverted)
+records: 19319
+record_labels: {'active': 9381, 'uncertain': 5833, 'inactive': 4105}
+censor_directions: {'exact': 15482, 'gt': 3780, 'lt': 57}
+gt_records_below_active_threshold_not_labelled_active: 80
+peptide_organism_pairs: 15996
+labelled_pairs: 11180
+labels: {'active': 7554, 'inactive': 3626}
+peptides: 7099
+by_organism: {'Escherichia coli ATCC 25922': {'active': 3453, 'inactive': 1517}, 'Pseudomonas aeruginosa ATCC 27853': {'active': 1939, 'inactive': 1070}, 'Staphylococcus aureus ATCC 25923': {'active': 2162, 'inactive': 1039}}
+by_split: {'train': 9015, 'test': 2165}
+Wrote /Users/lukajin/PycharmProjects/soamp/data/dev/mic_classification_dataset.csv
+Wrote /Users/lukajin/PycharmProjects/soamp/data/dev/peptide_split.csv

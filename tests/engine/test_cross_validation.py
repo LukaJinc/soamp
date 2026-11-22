@@ -99,7 +99,8 @@ def test_train_and_evaluate_fold_returns_expected_columns_and_row_count():
 
     assert set(metrics_by_group.keys()) == {"fit", "val"}
     for group_metrics in metrics_by_group.values():
-        assert set(group_metrics) == {"accuracy", "f1", "precision", "recall", "auroc"}
+        assert set(group_metrics) == {"accuracy", "f1", "precision", "recall", "auroc", "mcc",
+                                      "f1_matched", "mcc_matched", "pred_active_rate"}
 
     expected_cols = {
         "peptide_id", "sequence", "smiles", "organism", "has_noncanonical", "label",
@@ -143,7 +144,7 @@ def test_train_and_evaluate_fold_on_epoch_end_reports_finite_losses_per_epoch():
     )
     assert [h["epoch"] for h in history] == [1, 2, 3]
     for h in history:
-        assert set(h) == {"epoch", "fit_loss", "val_loss", "val_auroc"}
+        assert set(h) == {"epoch", "fit_loss", "val_loss", "val_auroc", "val_mcc", "val_f1"}
         assert np.isfinite([h["fit_loss"], h["val_loss"]]).all()
 
 
@@ -233,7 +234,7 @@ def test_snapshots_do_not_change_training_or_final_results():
 def test_final_snapshot_matches_returned_val_metrics():
     _, snapshots, metrics_by_group, _ = _run_with_snapshots(epochs=3, every=10)
     assert [s["epoch"] for s in snapshots] == [3]
-    for key in ("accuracy", "f1", "precision", "recall", "auroc"):
+    for key in ("accuracy", "f1", "precision", "recall", "auroc", "mcc"):
         assert snapshots[0]["metrics"]["val"][key] == pytest.approx(metrics_by_group["val"][key])
 
 

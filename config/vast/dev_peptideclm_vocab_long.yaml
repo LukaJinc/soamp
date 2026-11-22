@@ -1,0 +1,26 @@
+# PeptideCLM x vocab_embedding on the dev dataset (DBAASP 25/100 labels): 5-fold CV, 100 epochs,
+# snapshots every 5, on a big, fast GPU.
+# Feature builds run on the instance (PeptideCLM is the GPU-bound step) and are
+# skipped if their outputs already exist.
+experiments:
+  - config/train/cv_dev_peptideclm_vocab_long.yaml
+
+required_artifacts:
+  - data/dev/mic_classification_dataset.csv
+  - data/dev/peptide_split.csv
+
+prepare:
+  - cmd: [python, pipeline/features/01_build_peptide_features.py, --config, config/features/dev_peptide_peptideclm.yaml]
+    produces: [data/dev/peptide_features_peptideclm.csv]
+  - cmd: [python, pipeline/features/03_fit_peptide_scaler.py, --config, config/features/dev_peptide_peptideclm.yaml]
+    produces: [data/dev/peptide_feature_scaler_peptideclm.json]
+  - cmd: [python, pipeline/features/02_build_organism_vocab.py, --config, config/features/dev_organism_vocab.yaml]
+    produces: [data/dev/organism_vocab_vocab_embedding.json]
+
+instance:
+  gpu_name: A100_SXM4     # big GPU: speeds the PeptideCLM pass and large batches
+  num_gpus: 1
+  min_reliability: 0.99   # offers are ranked by reliability, not price (scripts/vast/find_offers.py)
+  disk_gb: 60
+  max_hours: 3
+  grace_seconds: 90

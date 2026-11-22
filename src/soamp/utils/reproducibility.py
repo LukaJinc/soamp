@@ -1,4 +1,5 @@
 """git SHA + seeding helpers, so neither is ever a bare literal in a script."""
+import os
 import random
 import subprocess
 from pathlib import Path
@@ -17,7 +18,14 @@ class ReproducibilityError(RuntimeError):
 
 def git_sha(repo_root: Path = REPO_ROOT) -> str:
     """`git rev-parse HEAD` run with cwd=repo_root. Raises
-    ReproducibilityError on any failure (not a repo, git missing)."""
+    ReproducibilityError on any failure (not a repo, git missing).
+
+    `SOAMP_GIT_SHA` overrides this when set: code shipped without `.git`
+    (scripts/vast/launch.sh rsyncs the working tree) records the laptop's
+    commit (suffixed `-dirty` if it had uncommitted changes) instead."""
+    env_sha = os.environ.get("SOAMP_GIT_SHA")
+    if env_sha:
+        return env_sha
     try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],

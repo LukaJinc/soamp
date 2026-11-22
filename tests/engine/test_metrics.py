@@ -98,3 +98,38 @@ def test_compute_metrics_by_organism_raises_on_length_mismatch():
     labels = np.array([1, 0, 1])
     with pytest.raises(MetricsError, match="align row-for-row"):
         compute_metrics_by_organism(logits, labels, ["org_a", "org_a"])
+
+
+def test_compute_binary_metrics_includes_mcc_matching_sklearn():
+    from sklearn.metrics import matthews_corrcoef
+
+    logits = np.array([2.0, -1.0, 0.5, -3.0, 1.5, -0.2])
+    labels = np.array([1, 0, 0, 0, 1, 1])
+    preds = (logits >= 0).astype(int)
+    m = compute_binary_metrics(logits, labels)
+    assert m["mcc"] == pytest.approx(matthews_corrcoef(labels, preds))
+
+
+def test_mcc_is_zero_not_nan_for_constant_predictions():
+    m = compute_binary_metrics(np.array([5.0, 5.0, 5.0, 5.0]), np.array([1, 0, 1, 0]))
+    assert m["mcc"] == 0.0
+
+
+def test_prior_matched_predictions_predict_the_true_rate():
+    from soamp.engine.metrics import prior_matched_predictions
+
+    logits = np.array([3.0, 2.0, 1.0, 0.5, -1.0, -2.0, -3.0, -4.0])
+    labels = np.array([1, 1, 1, 0, 1, 0, 0, 0])          # 4 of 8 active
+    preds = prior_matched_predictions(logits, labels)
+    assert preds.sum() == 4 and preds[:4].tolist() == [1, 1, 1, 1]
+
+
+def test_matched_metrics_ignore_a_constant_logit_shift_but_the_fixed_threshold_does_not():
+    rng = np.random.default_rng(3)
+    labels = (rng.random(400) < 0.85).astype(int)
+    logits = labels * 1.2 + rng.normal(size=400) - 0.2
+    base = compute_binary_metrics(logits, labels)
+    shifted = compute_binary_metrics(logits - 2.0, labels)   # same ranking, calibration shifted down
+    assert shifted["f1_matched"] == pytest.approx(base["f1_matched"])
+    assert shifted["mcc_matched"] == pytest.approx(base["mcc_matched"])
+    assert shifted["pred_active_rate"] < base["pred_active_rate"] and shifted["f1"] < base["f1"]

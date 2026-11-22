@@ -118,7 +118,7 @@ def train_and_evaluate_fold(
 
     `on_epoch_end`, if given, is called after every epoch with
     {"epoch": 1-based epoch, "fit_loss": mean training loss of that epoch,
-    "val_loss": loss on the `val` group, "val_auroc": its AUROC} -- this is
+    "val_loss": loss on the `val` group, "val_auroc"/"val_mcc"/"val_f1": its AUROC/MCC/F1} -- this is
     how callers get loss curves without this module knowing about any
     tracker. Requires a "val" key in `row_groups`; adds one no-grad pass over
     that group per epoch, and nothing at all when left None.
@@ -208,11 +208,14 @@ def train_and_evaluate_fold(
         fit_loss = trainer.train_epoch(fit_loader)["loss"]
         if on_epoch_end is not None:
             val_out = trainer.evaluate(val_loader)
+            val_metrics = compute_binary_metrics(val_out["logits"], val_out["labels"])
             on_epoch_end({
                 "epoch": epoch,
                 "fit_loss": fit_loss,
                 "val_loss": val_out["loss"],
-                "val_auroc": compute_binary_metrics(val_out["logits"], val_out["labels"])["auroc"],
+                "val_auroc": val_metrics["auroc"],
+                "val_mcc": val_metrics["mcc"],
+                "val_f1": val_metrics["f1"],
             })
 
         if snapshot_enabled and (epoch % snapshot_every_n_epochs == 0 or epoch == epochs):

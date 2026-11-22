@@ -4,7 +4,14 @@ training-loop coupling.
 from typing import Sequence
 
 import numpy as np
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    matthews_corrcoef,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 
 
 class MetricsError(ValueError):
@@ -17,8 +24,21 @@ def logits_to_predictions(logits: np.ndarray, threshold: float = 0.5) -> np.ndar
     return (probs >= threshold).astype(int)
 
 
+def prior_matched_predictions(logits: np.ndarray, labels: np.ndarray) -> np.ndarray:
+    """Predict "active" for the k highest-scoring rows, k = round(share of positives * n): a threshold
+    chosen so the predicted-active rate equals the true rate. Removes the calibration shift that a
+    class-weighted loss puts on the fixed 0.5 threshold, so F1/MCC measure ranking, not calibration."""
+    n = len(labels)
+    k = int(round(float(np.mean(labels)) * n))
+    preds = np.zeros(n, dtype=int)
+    preds[np.argsort(-logits, kind="stable")[:k]] = 1
+    return preds
+
+
 def compute_binary_metrics(logits: np.ndarray, labels: np.ndarray) -> dict[str, float]:
-    """{'accuracy', 'f1', 'precision', 'recall', 'auroc'}. Raises MetricsError
+    """{'accuracy', 'f1', 'precision', 'recall', 'auroc', 'mcc'} at the 0.5 threshold, plus
+    'f1_matched' / 'mcc_matched' at a prior-matched threshold (see prior_matched_predictions) and
+    'pred_active_rate' (share predicted active at 0.5; compare with the true rate). Raises MetricsError
     on single-class labels -- surfaced loudly rather than silently NaN'd.
     precision/recall use zero_division=0 (explicit, deterministic) rather
     than sklearn's warning-and-NaN default -- a model that predicts no
@@ -28,12 +48,19 @@ def compute_binary_metrics(logits: np.ndarray, labels: np.ndarray) -> dict[str, 
         raise MetricsError("labels contains a single class, AUROC is undefined")
     preds = logits_to_predictions(logits)
     probs = 1.0 / (1.0 + np.exp(-logits))
+    matched = prior_matched_predictions(logits, labels)
     return {
         "accuracy": float(accuracy_score(labels, preds)),
         "f1": float(f1_score(labels, preds)),
         "precision": float(precision_score(labels, preds, zero_division=0)),
         "recall": float(recall_score(labels, preds, zero_division=0)),
         "auroc": float(roc_auc_score(labels, probs)),
+        # Matthews correlation: defined as 0.0 by sklearn when predictions are
+        # constant, so a degenerate all-one-class model reads 0, not NaN.
+        "mcc": float(matthews_corrcoef(labels, preds)),
+        "f1_matched": float(f1_score(labels, matched)),
+        "mcc_matched": float(matthews_corrcoef(labels, matched)),
+        "pred_active_rate": float(np.mean(preds)),
     }
 
 

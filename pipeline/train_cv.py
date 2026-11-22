@@ -37,6 +37,7 @@ import pandas as pd
 import wandb
 from dotenv import load_dotenv
 
+from soamp.common.thresholds import build_threshold_report, load_threshold_table
 from soamp.data.factory import build_dataset
 from soamp.engine.config import REPO_ROOT, TrainConfig
 from soamp.engine.cross_validation import (
@@ -54,7 +55,7 @@ from soamp.utils.reproducibility import git_sha, seed_everything
 
 load_dotenv()
 
-METRIC_NAMES = ["accuracy", "f1", "precision", "recall", "auroc"]
+METRIC_NAMES = ["accuracy", "f1", "precision", "recall", "auroc", "mcc", "f1_matched", "mcc_matched"]
 
 # Hand-transcribed from config/splitting/base.yaml -- the folds come from
 # pipeline/splitting/01_build_peptide_split.py (data/peptide_split.json holds
@@ -181,11 +182,16 @@ def main() -> None:
     for prefix in ("fit", "val"):
         run.define_metric(f"{prefix}/*", step_metric="fold")
 
-    thresholds_df = pd.read_csv(REPO_ROOT / "config/thresholds/organism_thresholds.csv")
     organisms_used = sorted({r["organism"] for r in train_rows})
-    organism_thresholds = thresholds_df[
-        thresholds_df["match_key"].isin(organisms_used) & (thresholds_df["level"] == "species")
-    ][["match_key", "active_threshold_uM", "inactive_threshold_uM", "source"]]
+    thresholds_csv = CFG.thresholds_csv if CFG.thresholds_csv.is_absolute() else REPO_ROOT / CFG.thresholds_csv
+    thresholds_df = pd.read_csv(thresholds_csv)
+    threshold_sources = {
+        (r.level, r.match_key): ("" if pd.isna(r.source) else r.source) for r in thresholds_df.itertuples()
+    }
+    organism_thresholds = pd.DataFrame(build_threshold_report(
+        organisms_used, load_threshold_table(thresholds_csv), CFG.threshold_unit, threshold_sources,
+    ))
+    run.summary["threshold_unit"] = CFG.threshold_unit
     thresholds_artifact = wandb.Artifact(name="organism_activity_thresholds", type="dataset")
     thresholds_artifact.add(wandb.Table(dataframe=organism_thresholds), "organism_thresholds")
     run.log_artifact(thresholds_artifact)
@@ -207,6 +213,8 @@ def main() -> None:
                 f"fold/{fold_id}/fit_loss": entry["fit_loss"],
                 f"fold/{fold_id}/val_loss": entry["val_loss"],
                 f"fold/{fold_id}/val_auroc": entry["val_auroc"],
+                f"fold/{fold_id}/val_mcc": entry["val_mcc"],
+                f"fold/{fold_id}/val_f1": entry["val_f1"],
             })
 
         def log_snapshot(snapshot: dict, fold_id=fold_id) -> None:
@@ -275,6 +283,10 @@ def main() -> None:
     results_artifact = wandb.Artifact(name="cv_results", type="results")
     results_artifact.add(wandb.Table(dataframe=cv_results_df), "cv_results")
     results_artifact.add(wandb.Table(dataframe=loss_curves_df), "cv_loss_curves")
+    # Plain CSV copies too (Tables reload every column as a string): the per-epoch
+    # fit/val loss curves must outlive the machine the run executed on.
+    results_artifact.add_file(str(LOSS_CURVES_CSV_PATH), name=LOSS_CURVES_CSV_PATH.name)
+    results_artifact.add_file(str(RESULTS_CSV_PATH), name=RESULTS_CSV_PATH.name)
     snapshots_df = pd.DataFrame(snapshot_rows)
     snapshot_predictions_df = (
         pd.concat(snapshot_prediction_frames, ignore_index=True) if snapshot_prediction_frames else pd.DataFrame()

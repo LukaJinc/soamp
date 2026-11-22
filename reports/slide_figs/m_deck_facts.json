@@ -1,0 +1,214 @@
+{
+ "all_peptides": 25892,
+ "united_rows": 200566,
+ "activity_rows_all": 199901,
+ "rows_3org": 87511,
+ "peptides_3org": 20783,
+ "per_org": {
+  "Escherichia coli": 17992,
+  "Staphylococcus aureus": 17150,
+  "Pseudomonas aeruginosa": 12684
+ },
+ "orgs_per_peptide": {
+  "1": 4221,
+  "2": 6081,
+  "3": 10481
+ },
+ "raw_strain_names": 8319,
+ "organisms_after_merge": 1369,
+ "his_example": {
+  "id": 9575,
+  "name": "",
+  "sequence": "GHK",
+  "same_canonical": false
+ },
+ "smiles_example": {
+  "id": 9575,
+  "sequence": "GHK",
+  "smiles": "NCCCC[C@H](NC(=O)[C@H](Cc1cnc[nH]1)NC(=O)CN)C(=O)O",
+  "heavy_atoms": 24
+ },
+ "murcko_example": {
+  "id": 12647,
+  "name": "",
+  "sequence": "RFWR",
+  "scaffold": "O=C(CCc1ccccc1)NCCc1c[nH]c2ccccc12",
+  "cluster_size": 66
+ },
+ "peptides_with_smiles_3org": 20403,
+ "peptides_no_smiles": 380,
+ "peptides_clustered": 20374,
+ "duplicate_groups": 24,
+ "duplicate_ids_removed": 29,
+ "variant_rule": {
+  "label": 12771,
+  "single": 7603
+ },
+ "n_variants": {
+  "1": 7603,
+  "2": 10340,
+  "4": 2431
+ },
+ "n_clusters": 6529,
+ "singletons": 4642,
+ "no_scaffold": 2140,
+ "buckets": {
+  "1": {
+   "clusters": 4642,
+   "peptides": 4642
+  },
+  "2": {
+   "clusters": 817,
+   "peptides": 1634
+  },
+  "3-5": {
+   "clusters": 644,
+   "peptides": 2344
+  },
+  "6-10": {
+   "clusters": 222,
+   "peptides": 1649
+  },
+  "11-50": {
+   "clusters": 175,
+   "peptides": 3422
+  },
+  ">50": {
+   "clusters": 29,
+   "peptides": 6683
+  }
+ },
+ "peptides_in_clusters_ge6": 11754,
+ "share_in_clusters_ge6": 0.577,
+ "share_singleton_clusters": 0.711,
+ "top5": [
+  {
+   "scaffold": "no_scaffold",
+   "n": 2140
+  },
+  {
+   "scaffold": "c1ccccc1",
+   "n": 1146
+  },
+  {
+   "scaffold": "c1ccc2[nH]ccc2c1",
+   "n": 919
+  },
+  {
+   "scaffold": "C1CCNC1",
+   "n": 371
+  },
+  {
+   "scaffold": "c1c[nH]cn1",
+   "n": 233
+  },
+  {
+   "scaffold": "O=C(CCc1c[nH]c2ccccc12)NCCc1c[nH]c2ccccc12",
+   "n": 133
+  }
+ ],
+ "ringsys": {
+  "clusters": 2458,
+  "singletons": 1415,
+  "ring_free": 2140,
+  "largest_ring_bearing": 1146,
+  "multi_ring_peptides": 14882,
+  "multi_distinct_scaffolds": 6361,
+  "multi_distinct_ringsys": 2290,
+  "murcko_largest_ring_bearing": 1146
+ },
+ "linker_example": {
+  "ringsys_key": "c1ccccc1|c1ccccc1",
+  "n_peptides": 724,
+  "plain_scaffolds": 59,
+  "top": {
+   "O=C(CCc1ccccc1)NCC(=O)NCC(=O)NCC(=O)NCC(=O)NCC(=O)NCC(=O)NCC(=O)NCC(=O)NCC(=O)NCCc1ccccc1": 103,
+   "O=C(CCc1ccccc1)NCC(=O)NCC(=O)NCC(=O)NCCc1ccccc1": 74,
+   "O=C(CCc1ccccc1)NCC(=O)NCC(=O)NCCc1ccccc1": 72
+  }
+ },
+ "example_cluster": {
+  "scaffold": "C1CCNC1",
+  "n": 371,
+  "length_min": 2,
+  "length_median": 14.0,
+  "length_max": 67,
+  "organisms": {
+   "Escherichia coli": 343,
+   "Staphylococcus aureus": 325,
+   "Pseudomonas aeruginosa": 154
+  },
+  "samples": [
+   {
+    "id": 9305,
+    "name": "",
+    "sequence": "PK",
+    "length": 2
+   },
+   {
+    "id": 17777,
+    "name": "Perilipin-2 (62-71)",
+    "sequence": "MTSALPIIQK",
+    "length": 10
+   },
+   {
+    "id": 17012,
+    "name": "KL [L6P]",
+    "sequence": "KLLKLPKKLLKLLK",
+    "length": 14
+   },
+   {
+    "id": 4054,
+    "name": "D57 shuffled",
+    "sequence": "PKVVGLSIVVVKAKVSSALG",
+    "length": 20
+   },
+   {
+    "id": 5809,
+    "name": "Cod Cathelicidin",
+    "sequence": "SRSGRGSGKGGRGGSRGSSGSRGSKGPSGSRGSS",
+    "length": 67
+   }
+  ]
+ },
+ "dup_examples": [
+  {
+   "ids": [
+    5417,
+    17189,
+    17190,
+    17191,
+    17192,
+    17193,
+    17194
+   ],
+   "name": "Melittin",
+   "sequence": "GIGAVLKVLTTGLPALISWIKRKR"
+  },
+  {
+   "ids": [
+    3428,
+    23068
+   ],
+   "name": "Lasioglossin LL-III-D",
+   "sequence": "vnwkkilGkiikvvk"
+  },
+  {
+   "ids": [
+    6240,
+    21269
+   ],
+   "name": "C(RW)3",
+   "sequence": "RWRWRW"
+  },
+  {
+   "ids": [
+    24727,
+    24729
+   ],
+   "name": "5a-cyclic",
+   "sequence": "RRRRWXW"
+  }
+ ],
+ "dup_groups_largest": 7
+}

@@ -1,0 +1,23 @@
+# 5-fold CV (5 epochs) of PeptideCLM x vocab_embedding on the dev dataset
+# (data/dev/: 3 target strains, labels from `activity` + DBAASP 25/100 thresholds).
+# First run on the new data -- mainly a check of the wandb setup (config, MCC,
+# loss curves), so epochs stay short; scale up with a *_long variant later.
+_base_: cv_peptideclm_vocab.yaml
+
+exp_id: dev_peptideclm_vocab_cv
+
+paths:
+  data_dir: data/dev
+
+# DBAASP 25/100 cutoffs (dev_dbaasp_thresholds.csv) are applied to DBAASP `activity` as stored
+# (ug/ml-normalised), no MW conversion.
+thresholds_csv: config/thresholds/dev_dbaasp_thresholds.csv
+threshold_unit: "µg/ml (DBAASP activity, unconverted)"
+
+wandb_group: dev_featurization_cv_v2
+wandb_tags:
+  - dev_dataset
+  - peptideclm_embedding
+  - vocab_embedding
+  - attention_fusion_classifier
+  - cv

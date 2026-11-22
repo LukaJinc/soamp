@@ -1,0 +1,34 @@
+# Class-balancing check on the dev data (tests the explanation of the prod-vs-dev precision/recall
+# behaviour): identical to dev_sweep_small_wd1e-3 (PeptideCLM x vocab, small model, weight decay 1e-3)
+# except class_balancing.mode: none, i.e. unweighted BCE. 40 epochs, snapshots every 2, so it is
+# directly comparable with that run (and, via the prior-matched metrics, free of calibration shifts).
+_base_: cv_dev_peptideclm_vocab.yaml
+
+exp_id: dev_cb_none_small_wd1e-3
+
+class_balancing:
+  mode: none
+
+model:
+  attention_fusion_classifier:
+    projection_dim: 32
+    hidden_dims: [32, 16]
+
+optim:
+  weight_decay: 0.001
+
+loop:
+  epochs: 40
+
+cv:
+  snapshot_every_n_epochs: 2
+
+wandb_group: dev_class_balance_v1
+wandb_tags:
+  - dev_dataset
+  - peptideclm_embedding
+  - vocab_embedding
+  - attention_fusion_classifier
+  - small_model
+  - class_balancing_none
+  - cv

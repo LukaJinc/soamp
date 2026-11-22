@@ -1,0 +1,20 @@
+# Dev-data classification dataset (scripts/EDA/09_data_processing.ipynb outputs).
+# Consumed by pipeline/data/03_build_dev_classification_dataset.py.
+paths:
+  processed_parquet: data/dev/dbaasp_dev_processed.parquet
+  split_parquet: data/dev/dbaasp_dev_split.parquet
+  thresholds_csv: config/thresholds/dev_dbaasp_thresholds.csv   # DBAASP: active <25, non-active >100 ug/ml
+  out_dir: data/dev
+  reports_dir: reports
+
+target_organisms:
+  - Escherichia coli ATCC 25922
+  - Staphylococcus aureus ATCC 25923
+  - Pseudomonas aeruginosa ATCC 27853
+
+# NOTE: `activity` is DBAASP's ug/ml-normalised value (not uM). The 25/100 cutoffs of
+# dev_dbaasp_thresholds.csv are applied to it directly, with no MW conversion; the
+# output column `mic_value_uM` keeps its legacy name but holds that same number.
+measure: MIC
+strict_boundaries: true   # <25 active / >100 inactive strictly, as DBAASP; exactly 25 or 100 -> uncertain
+use_censoring: true   # '>x' / '<x' concentrations become one-sided intervals, not exact values

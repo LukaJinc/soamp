@@ -1,0 +1,357 @@
+{
+  "id": 0,
+  "dbaaspId": "string",
+  "name": "string",
+  "majorName": "string",
+  "sequence": "string",
+  "sequenceLength": 0,
+  "synthesisType": {
+    "name": "string",
+    "description": "string"
+  },
+  "complexity": {
+    "name": "string",
+    "description": "string"
+  },
+  "pdbs": [
+    {
+      "name": "string",
+      "pdbUrl": "string",
+      "pdbFileUrl": "string"
+    }
+  ],
+  "pubChem": {
+    "cid": "string",
+    "cidUrl": "string"
+  },
+  "noteReference": "string",
+  "url": "string",
+  "structureModel": {
+    "representativeStructure": "string",
+    "selfConsistency": "string",
+    "secondaryStructure": "string",
+    "trajectoryDCD": "string",
+    "trajectoryPSF": "string",
+    "trajectoryWithWaterDCD": "string",
+    "trajectoryWithWaterPSF": "string",
+    "protocolId": 0,
+    "protocolDescription": "string"
+  },
+  "targetGroups": [
+    {
+      "name": "string",
+      "description": "string"
+    }
+  ],
+  "targetObjects": [
+    {
+      "name": "string",
+      "description": "string"
+    }
+  ],
+  "physicoChemicalProperties": [
+    {
+      "name": "string",
+      "value": "string"
+    }
+  ],
+  "monomers": [
+    "string"
+  ],
+  "sourceGenes": [
+    {
+      "id": 0,
+      "kingdom": {
+        "name": "string",
+        "description": "string"
+      },
+      "source": "string",
+      "subkingdom": "string",
+      "plasmid": "string",
+      "gene": "string",
+      "chromLoc": "string",
+      "locus": "string",
+      "note": "string",
+      "dblink": {
+        "name": "string",
+        "url": "string"
+      }
+    }
+  ],
+  "intrachainBonds": [
+    {
+      "id": 0,
+      "position1": 0,
+      "position2": 0,
+      "type": {
+        "id": 0,
+        "name": "string",
+        "description": "string"
+      },
+      "cycleType": {
+        "id": 0,
+        "intraChainBondTypeId": 0,
+        "name": "string",
+        "description": "string"
+      },
+      "chainParticipating": {
+        "id": 0,
+        "name": "string",
+        "description": "string"
+      },
+      "note": "string"
+    }
+  ],
+  "interchainBonds": [
+    {
+      "id": 0,
+      "chain1": 0,
+      "chain2": 0,
+      "chain3": 0,
+      "chain4": 0,
+      "note": "string",
+      "type": {
+        "id": 0,
+        "name": "string",
+        "description": "string"
+      },
+      "chainParticipating": {
+        "id": 0,
+        "name": "string",
+        "description": "string"
+      },
+      "participatingInCycle": "string"
+    }
+  ],
+  "coordinationBonds": [
+    {
+      "id": 0,
+      "peptideId": 0,
+      "metalIons": "string",
+      "positionOfAa": 0,
+      "group": "string",
+      "reference": "string",
+      "bondNumber": 0
+    }
+  ],
+  "unusualAminoAcids": [
+    {
+      "id": 0,
+      "position": 0,
+      "modificationType": {
+        "name": "string",
+        "description": "string",
+        "molarMass": 0.1,
+        "smiles": "string",
+        "smilesImageUrl": "string",
+        "pubchemCid": "string"
+      },
+      "beforeModification": "string",
+      "note": "string"
+    }
+  ],
+  "targetActivities": [
+    {
+      "id": 0,
+      "peptideId": 0,
+      "targetSpecies": {
+        "name": "string",
+        "description": "string"
+      },
+      "activityMeasureGroup": {
+        "name": "string",
+        "description": "string"
+      },
+      "activityMeasureValue": "string",
+      "concentration": "string",
+      "unit": {
+        "name": "string",
+        "description": "string"
+      },
+      "ph": "string",
+      "ionicStrength": "string",
+      "saltType": "string",
+      "medium": {
+        "name": "string",
+        "description": "string"
+      },
+      "cfu": "string",
+      "cfuGroup": {
+        "name": "string",
+        "description": "string"
+      },
+      "note": "string",
+      "reference": "string",
+      "activity": 0.1
+    }
+  ],
+  "antibiofilmActivities": [
+    {
+      "id": 0,
+      "targetSpecies": {
+        "name": "string",
+        "description": "string"
+      },
+      "activityMeasureGroup": {
+        "name": "string",
+        "description": "string"
+      },
+      "activityMeasureValue": "string",
+      "concentration": "string",
+      "unit": {
+        "name": "string",
+        "description": "string"
+      },
+      "medium": {
+        "name": "string",
+        "description": "string"
+      },
+      "cfu": "string",
+      "cfuGroup": {
+        "name": "string",
+        "description": "string"
+      },
+      "note": "string",
+      "reference": "string",
+      "peptideId": 0
+    }
+  ],
+  "uniprots": [
+    {
+      "id": 0,
+      "uniprotId": "string",
+      "description": "string",
+      "proPeptide": {
+        "name": "string",
+        "description": "string"
+      },
+      "uniprotUrl": "string"
+    }
+  ],
+  "hemoliticCytotoxicActivities": [
+    {
+      "id": 0,
+      "peptideId": 0,
+      "targetCell": {
+        "name": "string",
+        "description": "string"
+      },
+      "activityMeasureForLysisGroup": {
+        "name": "string",
+        "description": "string"
+      },
+      "activityMeasureForLysisValue": "string",
+      "concentration": "string",
+      "unit": {
+        "name": "string",
+        "description": "string"
+      },
+      "ph": "string",
+      "ionicStrength": "string",
+      "saltType": "string",
+      "note": "string",
+      "reference": "string",
+      "activity": 0.1
+    }
+  ],
+  "articles": [
+    {
+      "id": 0,
+      "journal": {
+        "name": "string",
+        "description": "string"
+      },
+      "year": 0,
+      "volume": "string",
+      "pages": "string",
+      "title": "string",
+      "additional": "string",
+      "pubmed": {
+        "pubmedId": "string",
+        "pubmedUrl": "string"
+      },
+      "authors": [
+        {
+          "name": "string",
+          "description": "string"
+        }
+      ]
+    }
+  ],
+  "synergies": [
+    {
+      "id": 0,
+      "targetSpecie": {
+        "name": "string",
+        "description": "string"
+      },
+      "activityMeasureGroup": {
+        "name": "string",
+        "description": "string"
+      },
+      "unit": {
+        "name": "string",
+        "description": "string"
+      },
+      "peptideId": 0,
+      "antibioticId": 0,
+      "antibioticName": "string",
+      "peptideActivity": "string",
+      "peptideAntibioticActivity": "string",
+      "antibioticActivity": "string",
+      "antibioticPeptideActivity": "string",
+      "fici": "string",
+      "reference": "string"
+    }
+  ],
+  "smiles": [
+    {
+      "id": 0,
+      "smiles": "string",
+      "smilesImageUrl": "string",
+      "description": "string",
+      "manuallyEdited": true,
+      "pubChemCid": "string",
+      "pubChemCidUrl": "string",
+      "lastUpdatedAt": "2026-11-12T10:19:47.565Z"
+    }
+  ],
+  "opms": [
+    {
+      "name": "string",
+      "opmUrl": "string"
+    }
+  ],
+  "nterminus": {
+    "name": "string",
+    "description": "string",
+    "molarMass": 0.1,
+    "smiles": "string",
+    "smilesImageUrl": "string",
+    "pubchemCid": "string"
+  },
+  "cterminus": {
+    "name": "string",
+    "description": "string",
+    "molarMass": 0.1,
+    "smiles": "string",
+    "smilesImageUrl": "string",
+    "pubchemCid": "string"
+  },
+  "nTerminus": {
+    "name": "string",
+    "description": "string",
+    "molarMass": 0.1,
+    "smiles": "string",
+    "smilesImageUrl": "string",
+    "pubchemCid": "string"
+  },
+  "cTerminus": {
+    "name": "string",
+    "description": "string",
+    "molarMass": 0.1,
+    "smiles": "string",
+    "smilesImageUrl": "string",
+    "pubchemCid": "string"
+  }
+}

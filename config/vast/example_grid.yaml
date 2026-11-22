@@ -1,0 +1,23 @@
+# Example run spec for scripts/vast/. Copy and edit per experiment batch.
+# Either list train_cv configs explicitly, or generate a peptide x organism grid
+# (configs resolved as config/train/cv_<peptide>_<organism><variant>.yaml).
+grid:
+  peptide: [peptideclm, molgraph]
+  organism: [vocab, dnabert]
+  variant: "_long"
+  exclude: []
+
+# experiments:
+#   - config/train/cv_peptideclm_vocab_long.yaml
+
+# Files that must exist before training (checked up front).
+required_artifacts:
+  - data/mic_classification_dataset.csv
+  - data/peptide_split.csv
+
+instance:
+  gpu_name: RTX_4090      # bigger GPU -> faster PeptideCLM/GIN cells; tiny-MLP cells gain little
+  num_gpus: 1
+  disk_gb: 50
+  max_hours: 6            # hard cap, then the instance is destroyed
+  grace_seconds: 120

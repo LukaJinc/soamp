@@ -25,6 +25,7 @@ dependencies = [
     "transformers==5.16.1",
     "SmilesPE==0.0.3",
     "wandb==0.28.2",
+    "biopython==1.88",
 ]
 
 [project.optional-dependencies]

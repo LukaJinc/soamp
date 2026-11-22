@@ -1,0 +1,10 @@
+{
+  "method": "vocab_embedding",
+  "unknown_index": 0,
+  "vocab": {
+    "Escherichia coli ATCC 25922": 1,
+    "Pseudomonas aeruginosa ATCC 27853": 2,
+    "Staphylococcus aureus ATCC 25923": 3
+  },
+  "vocab_size": 4
+}

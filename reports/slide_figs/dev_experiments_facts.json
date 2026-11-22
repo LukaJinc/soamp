@@ -1,0 +1,101 @@
+{
+  "runs": [
+    {
+      "run": "dev_peptideclm_vocab_cv",
+      "group": "dev_featurization_cv_v1",
+      "source": "row-level predictions (loss recomputed)",
+      "n_parameters": 184577,
+      "epochs": 5,
+      "created_at": "2026-11-13T06:13:08Z"
+    },
+    {
+      "run": "dev_peptideclm_vocab_cv_long",
+      "group": "dev_featurization_cv_v3",
+      "source": "cv_snapshots table",
+      "n_parameters": 184577,
+      "epochs": 100,
+      "created_at": "2026-11-13T06:35:01Z"
+    },
+    {
+      "run": "dev_sweep_wd1e-3",
+      "group": "dev_sweep_v1",
+      "source": "cv_snapshots table",
+      "n_parameters": 184577,
+      "epochs": 40,
+      "created_at": "2026-11-13T07:10:50Z"
+    },
+    {
+      "run": "dev_sweep_wd1e-2",
+      "group": "dev_sweep_v1",
+      "source": "cv_snapshots table",
+      "n_parameters": 184577,
+      "epochs": 40,
+      "created_at": "2026-11-13T07:19:52Z"
+    },
+    {
+      "run": "dev_sweep_lr1e-4",
+      "group": "dev_sweep_v1",
+      "source": "cv_snapshots table",
+      "n_parameters": 184577,
+      "epochs": 40,
+      "created_at": "2026-11-13T07:28:56Z"
+    },
+    {
+      "run": "dev_sweep_lr3e-4_wd1e-3",
+      "group": "dev_sweep_v1",
+      "source": "cv_snapshots table",
+      "n_parameters": 184577,
+      "epochs": 40,
+      "created_at": "2026-11-13T07:37:52Z"
+    },
+    {
+      "run": "dev_sweep_small",
+      "group": "dev_sweep_v1",
+      "source": "cv_snapshots table",
+      "n_parameters": 31841,
+      "epochs": 40,
+      "created_at": "2026-11-13T07:46:54Z"
+    },
+    {
+      "run": "dev_sweep_small_wd1e-3",
+      "group": "dev_sweep_v1",
+      "source": "cv_snapshots table",
+      "n_parameters": 31841,
+      "epochs": 40,
+      "created_at": "2026-11-13T07:55:55Z"
+    },
+    {
+      "run": "dev_repr_rdkit_vocab_small",
+      "group": "dev_repr_v1",
+      "source": "cv_snapshots table",
+      "n_parameters": 7681,
+      "epochs": 100,
+      "created_at": "2026-11-13T08:49:31Z"
+    },
+    {
+      "run": "dev_repr_molgraph_vocab_small",
+      "group": "dev_repr_v1",
+      "source": "cv_snapshots table",
+      "n_parameters": 61029,
+      "epochs": 100,
+      "created_at": "2026-11-13T09:18:43Z"
+    },
+    {
+      "run": "dev_cb_none_small_wd1e-3",
+      "group": "dev_class_balance_v1",
+      "source": "cv_snapshots table",
+      "n_parameters": 31841,
+      "epochs": 40,
+      "created_at": "2026-11-13T09:43:24Z"
+    }
+  ],
+  "metrics": [
+    "mcc",
+    "precision",
+    "recall",
+    "auroc",
+    "accuracy",
+    "f1",
+    "loss"
+  ]
+}

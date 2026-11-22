@@ -1,0 +1,26 @@
+# Molecular-graph cell of the peptide-representation comparison (dev data, vocab strain embedding,
+# small model + weight decay 1e-3, 100 epochs, 5-fold CV, snapshots every 2). The RDKit cell already
+# finished (wandb dev_repr_rdkit_vocab_small); the first attempt at this cell ran on the CPU (torch
+# CUDA-build mismatch, see remote_main.sh) and was stopped.
+# PeptideCLM is not rerun -- its dev_sweep_small_wd1e-3 run is the reference (comparable to epoch 40).
+# Features are built locally and shipped with rsync; the prepare steps below only run if missing.
+experiments:
+  - config/train/cv_dev_repr_molgraph_vocab_small.yaml
+
+required_artifacts:
+  - data/dev/mic_classification_dataset.csv
+  - data/dev/peptide_split.csv
+
+prepare:
+  - cmd: [python, pipeline/features/03_fit_peptide_scaler.py, --config, config/features/dev_peptide_molgraph.yaml]
+    produces: [data/dev/peptide_feature_scaler_molgraph.json]
+  - cmd: [python, pipeline/features/02_build_organism_vocab.py, --config, config/features/dev_organism_vocab.yaml]
+    produces: [data/dev/organism_vocab_vocab_embedding.json]
+
+instance:
+  gpu_name: A100_SXM4
+  num_gpus: 1
+  disk_gb: 60
+  min_reliability: 0.99   # offers are ranked by reliability, not price (scripts/vast/find_offers.py)
+  max_hours: 4            # CPU speed was ~27 s/epoch (3.75 h); on the GPU it should be far less
+  grace_seconds: 90

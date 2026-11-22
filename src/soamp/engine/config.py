@@ -188,3 +188,9 @@ class TrainConfig(BaseModel):
     # in the UI without any tracking-layer change.
     wandb_group: str | None = None
     wandb_tags: list[str] = []
+    # Unit the active/inactive thresholds are expressed in. Only recorded (wandb
+    # `organism_activity_thresholds` artifact + run summary); never used in maths.
+    threshold_unit: str = "µM"
+    # Threshold table recorded in the wandb `organism_activity_thresholds` artifact
+    # (repo-relative); must be the one the training data was labelled with.
+    thresholds_csv: Path = Path("config/thresholds/organism_thresholds.csv")

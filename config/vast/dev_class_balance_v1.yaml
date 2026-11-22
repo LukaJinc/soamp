@@ -1,0 +1,24 @@
+# Class-balancing check on the dev data: PeptideCLM x vocab, small model + weight decay 1e-3,
+# unweighted loss (class_balancing.mode: none), 40 epochs. Compare with dev_sweep_small_wd1e-3.
+experiments:
+  - config/train/cv_dev_cb_none_small.yaml
+
+required_artifacts:
+  - data/dev/mic_classification_dataset.csv
+  - data/dev/peptide_split.csv
+
+prepare:
+  - cmd: [python, pipeline/features/01_build_peptide_features.py, --config, config/features/dev_peptide_peptideclm.yaml]
+    produces: [data/dev/peptide_features_peptideclm.csv]
+  - cmd: [python, pipeline/features/03_fit_peptide_scaler.py, --config, config/features/dev_peptide_peptideclm.yaml]
+    produces: [data/dev/peptide_feature_scaler_peptideclm.json]
+  - cmd: [python, pipeline/features/02_build_organism_vocab.py, --config, config/features/dev_organism_vocab.yaml]
+    produces: [data/dev/organism_vocab_vocab_embedding.json]
+
+instance:
+  gpu_name: A100_SXM4
+  num_gpus: 1
+  disk_gb: 60
+  min_reliability: 0.99   # offers are ranked by reliability, not price (scripts/vast/find_offers.py)
+  max_hours: 1.5
+  grace_seconds: 90

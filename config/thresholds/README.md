@@ -50,3 +50,11 @@ directly in the CSV, then add an entry to `CHANGELOG.md` describing what
 changed and why. Re-running `pipeline/labeling/build_threshold_template.py`
 after the underlying dataset changes will refresh `n_dataset_rows` and add
 any newly-seen organisms without touching values you've already filled in.
+
+## Dev table (`dev_dbaasp_thresholds.csv`)
+
+Same schema as `organism_thresholds.csv`, used only by `pipeline/data/03_build_dev_classification_dataset.py`.
+**Its `active_threshold_uM` / `inactive_threshold_uM` values are in ug/ml** (kept under the legacy column
+names so `load_threshold_table` is reused): the dev dataset's `activity` is DBAASP's ug/ml-normalised value
+and the cutoffs are applied to it directly. 25 / 100 follow DBAASP's prediction tools (strict inequalities).
+See `CHANGELOG.md` v0.2.0.

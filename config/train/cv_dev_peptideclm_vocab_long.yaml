@@ -1,0 +1,22 @@
+# 100-epoch counterpart of cv_dev_peptideclm_vocab.yaml (dev data, DBAASP 25/100 labels):
+# every fold trains up to 100 epochs, with fit/val metrics + held-out predictions
+# snapshotted every 5 epochs, so one run shows the metric as a function of epoch budget
+# (constant LR: the model at epoch N equals an N-epoch run).
+_base_: cv_dev_peptideclm_vocab.yaml
+
+exp_id: dev_peptideclm_vocab_cv_long
+
+loop:
+  epochs: 100
+
+cv:
+  snapshot_every_n_epochs: 5
+
+wandb_group: dev_featurization_cv_v3
+wandb_tags:
+  - dev_dataset
+  - peptideclm_embedding
+  - vocab_embedding
+  - attention_fusion_classifier
+  - cv
+  - long

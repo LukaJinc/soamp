@@ -1,0 +1,7 @@
+# Molecular-graph peptide representation for the dev dataset (data/dev/). Only the tiny
+# self-describing scaler stub is written; graphs are built from the SMILES at train time.
+_base_: peptide_molgraph.yaml
+
+paths:
+  data_dir: data/dev
+  reports_dir: reports/dev   # keep dev logs apart from the production-run logs in reports/

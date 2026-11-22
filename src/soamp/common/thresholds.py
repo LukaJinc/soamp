@@ -145,3 +145,39 @@ def lookup_threshold(table: ThresholdTable, organism: str) -> ThresholdMatch | N
         return ThresholdMatch(active, inactive, "genus", genus)
 
     return None
+
+
+def species_of(organism: str) -> str:
+    """'Escherichia coli ATCC 25922' -> 'Escherichia coli': the table is
+    species-level, so a strain inherits its species' breakpoints."""
+    return " ".join(organism.split()[:2])
+
+
+def build_threshold_report(
+    organisms: list[str],
+    table: ThresholdTable,
+    unit: str,
+    sources: dict[tuple[str, str], str] | None = None,
+) -> list[dict]:
+    """One row per organism describing the breakpoints actually applied, incl.
+    the unit they are expressed in (used for the wandb `organism_activity_
+    thresholds` artifact). Resolution: an exact species-level match on the
+    organism string, else its species (strain stripped, then the genus
+    fallback of `lookup_threshold`); organisms with no match get blank values
+    and match_level 'none' rather than being silently omitted."""
+    sources = sources or {}
+    rows = []
+    for organism in sorted(set(organisms)):
+        match = lookup_threshold(table, organism)
+        if match is None or match.match_level != "species":
+            match = lookup_threshold(table, species_of(organism)) or match
+        rows.append({
+            "organism": organism,
+            "match_level": match.match_level if match else "none",
+            "match_key": match.match_key if match else "",
+            "active_threshold": match.active_threshold_uM if match else None,
+            "inactive_threshold": match.inactive_threshold_uM if match else None,
+            "threshold_unit": unit,
+            "source": sources.get((match.match_level, match.match_key), "") if match else "",
+        })
+    return rows

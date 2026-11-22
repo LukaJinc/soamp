@@ -1,0 +1,11 @@
+# Smoke test: one cheap 5-epoch CPU-light cell on the cheapest GPU.
+experiments:
+  - config/train/cv_rdkit_vocab.yaml
+required_artifacts:
+  - data/mic_classification_dataset.csv
+  - data/peptide_split.csv
+instance:
+  gpu_name: RTX_3060
+  disk_gb: 30
+  max_hours: 0.5
+  grace_seconds: 60

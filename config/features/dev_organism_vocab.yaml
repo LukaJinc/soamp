@@ -1,0 +1,7 @@
+# Vocab-embedding organism features for the dev dataset (data/dev/); the vocab
+# is over the 3 strain names in its mic_classification_dataset.csv.
+_base_: organism_vocab.yaml
+
+paths:
+  data_dir: data/dev
+  reports_dir: reports/dev   # keep dev logs apart from the production-run logs in reports/

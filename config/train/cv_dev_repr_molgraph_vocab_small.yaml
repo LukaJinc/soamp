@@ -1,0 +1,36 @@
+# Dev-data representation comparison: molecular-graph peptide features x vocab_embedding strains, SMALL model
+# (projection 32, MLP [32, 16]) + weight decay 1e-3 -- the best end state of the dev_sweep_v1 sweep
+# (selection metrics: val loss, MCC, F1). Same model/optimiser settings for every representation so
+# only the peptide side differs; the PeptideCLM counterpart is dev_sweep_small_wd1e-3 (40 epochs;
+# constant LR, so comparable to this run up to epoch 40). 100 epochs, snapshots every 2.
+_base_: cv_dev_peptideclm_vocab.yaml
+
+exp_id: dev_repr_molgraph_vocab_small
+
+input_files:
+  peptide_features_filename: peptide_features_molgraph.csv
+  peptide_feature_scaler_filename: peptide_feature_scaler_molgraph.json
+  organism_vocab_filename: organism_vocab_vocab_embedding.json
+
+model:
+  attention_fusion_classifier:
+    projection_dim: 32
+    hidden_dims: [32, 16]
+
+optim:
+  weight_decay: 0.001
+
+loop:
+  epochs: 100
+
+cv:
+  snapshot_every_n_epochs: 2
+
+wandb_group: dev_repr_v1
+wandb_tags:
+  - dev_dataset
+  - molecular_graph
+  - vocab_embedding
+  - attention_fusion_classifier
+  - small_model
+  - cv

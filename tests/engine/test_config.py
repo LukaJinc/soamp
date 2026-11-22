@@ -162,3 +162,19 @@ def test_long_cv_configs_snapshot_and_keep_their_base_cell(peptide, organism):
     assert cfg.loop.epochs == 100 and cfg.cv.snapshot_every_n_epochs == 5
     assert cfg.wandb_group == "featurization_grid_cv_v3"
     assert cfg.input_files == base.input_files and cfg.model == base.model
+
+
+def test_threshold_unit_defaults_to_uM_and_is_overridable():
+    from soamp.engine.config import TrainConfig
+
+    assert TrainConfig().threshold_unit == "µM"
+    assert TrainConfig(threshold_unit="µg/ml").threshold_unit == "µg/ml"
+
+
+def test_thresholds_csv_defaults_to_legacy_table_and_is_overridable():
+    from pathlib import Path
+
+    from soamp.engine.config import TrainConfig
+
+    assert TrainConfig().thresholds_csv == Path("config/thresholds/organism_thresholds.csv")
+    assert TrainConfig(thresholds_csv="x.csv").thresholds_csv == Path("x.csv")
