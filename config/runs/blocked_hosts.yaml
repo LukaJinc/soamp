@@ -1,0 +1,4 @@
+# vast.ai hosts the launcher must never rent (soamp.runs.vast.VastClient.search_offers).
+# Add a host here when an instance on it cannot do its job; keep the reason.
+blocked_host_ids:
+  - 46431   # 2026-11-22: machine 51069 (UK, 45.81.32.55): api.wandb.ai answers 403 to every request, so wandb cannot even log in

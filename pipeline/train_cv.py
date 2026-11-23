@@ -39,7 +39,7 @@ from dotenv import load_dotenv
 
 from soamp.common.thresholds import build_threshold_report, load_threshold_table
 from soamp.data.factory import build_dataset
-from soamp.engine.config import REPO_ROOT, TrainConfig
+from soamp.engine.config import REPO_ROOT, TREE_ARCHITECTURES, TrainConfig
 from soamp.engine.cross_validation import (
     assign_train_folds,
     load_peptide_split,
@@ -47,6 +47,7 @@ from soamp.engine.cross_validation import (
     train_and_evaluate_fold,
 )
 from soamp.engine.tracking import build_tracker, count_parameters
+from soamp.engine.tree_cv import count_tree_parameters, train_and_evaluate_fold_tree
 from soamp.model.factory import build_model
 from soamp.utils.config import load_config
 from soamp.utils.device import resolve_device
@@ -169,7 +170,8 @@ def main() -> None:
 
     # Every fold builds the same architecture, so one throwaway instance from
     # the preview bundle gives the exact trainable-parameter count to log.
-    run.summary["n_parameters"] = count_parameters(build_model(
+    is_tree = CFG.model.architecture in TREE_ARCHITECTURES
+    run.summary["n_parameters"] = count_tree_parameters(CFG.model.active_kwargs()) if is_tree else count_parameters(build_model(
         preview_bundle, architecture=CFG.model.architecture,
         graph_encoder_kwargs=CFG.model.graph_encoder.model_dump(), **CFG.model.active_kwargs(),
     ))
@@ -226,28 +228,45 @@ def main() -> None:
                 snapshot["val_predictions"].assign(val_fold_id=fold_id, epoch=snapshot["epoch"])
             )
 
-        metrics_by_group, results_df = train_and_evaluate_fold(
-            row_groups,
-            eval_groups=("fit", "val"),
-            epochs=CFG.loop.epochs,
-            seed=CFG.loop.seed,
-            peptide_method=peptide_method,
-            peptide_method_kwargs=peptide_method_kwargs,
-            organism_method=organism_method,
-            architecture=CFG.model.architecture,
-            architecture_kwargs=CFG.model.active_kwargs(),
-            graph_encoder_kwargs=CFG.model.graph_encoder.model_dump(),
-            batch_size=CFG.loop.batch_size,
-            learning_rate=CFG.optim.learning_rate,
-            weight_decay=CFG.optim.weight_decay,
-            class_balancing_mode=CFG.class_balancing.mode,
-            class_balancing_fixed_pos_weight=CFG.class_balancing.fixed_pos_weight,
-            device=device,
-            watch=True,
-            on_epoch_end=log_epoch,
-            snapshot_every_n_epochs=CFG.cv.snapshot_every_n_epochs,
-            on_snapshot=log_snapshot if CFG.cv.snapshot_every_n_epochs else None,
-        )
+        if is_tree:
+            # Tree architectures: one boosting round = one "epoch" in the curves/snapshots below.
+            metrics_by_group, results_df = train_and_evaluate_fold_tree(
+                row_groups,
+                eval_groups=("fit", "val"),
+                seed=CFG.loop.seed,
+                peptide_method=peptide_method,
+                peptide_method_kwargs=peptide_method_kwargs,
+                organism_method=organism_method,
+                params=CFG.model.active_kwargs(),
+                class_balancing_mode=CFG.class_balancing.mode,
+                class_balancing_fixed_pos_weight=CFG.class_balancing.fixed_pos_weight,
+                on_epoch_end=log_epoch,
+                snapshot_every_n_epochs=CFG.cv.snapshot_every_n_epochs,
+                on_snapshot=log_snapshot if CFG.cv.snapshot_every_n_epochs else None,
+            )
+        else:
+            metrics_by_group, results_df = train_and_evaluate_fold(
+                row_groups,
+                eval_groups=("fit", "val"),
+                epochs=CFG.loop.epochs,
+                seed=CFG.loop.seed,
+                peptide_method=peptide_method,
+                peptide_method_kwargs=peptide_method_kwargs,
+                organism_method=organism_method,
+                architecture=CFG.model.architecture,
+                architecture_kwargs=CFG.model.active_kwargs(),
+                graph_encoder_kwargs=CFG.model.graph_encoder.model_dump(),
+                batch_size=CFG.loop.batch_size,
+                learning_rate=CFG.optim.learning_rate,
+                weight_decay=CFG.optim.weight_decay,
+                class_balancing_mode=CFG.class_balancing.mode,
+                class_balancing_fixed_pos_weight=CFG.class_balancing.fixed_pos_weight,
+                device=device,
+                watch=True,
+                on_epoch_end=log_epoch,
+                snapshot_every_n_epochs=CFG.cv.snapshot_every_n_epochs,
+                on_snapshot=log_snapshot if CFG.cv.snapshot_every_n_epochs else None,
+            )
         fit_m, val_m = metrics_by_group["fit"], metrics_by_group["val"]
         log.info(
             f"fold {fold_id}: fit_auroc={fit_m['auroc']:.4f} val_auroc={val_m['auroc']:.4f} "

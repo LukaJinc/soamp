@@ -5,7 +5,7 @@ of silently falling back to a default three files away from where it's used.
 """
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -61,6 +61,25 @@ class GraphEncoderConfig(BaseModel):
     dropout: float = 0.1
 
 
+class HistGradientBoostingClassifierConfig(BaseModel):
+    """scikit-learn HistGradientBoostingClassifier hyperparameters (tree architecture;
+    one boosting round = one 'epoch' in the logged curves, so loop.epochs is ignored)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    max_iter: int = Field(default=200, ge=1)
+    learning_rate: float = Field(default=0.1, gt=0)
+    max_leaf_nodes: int = Field(default=31, ge=2)
+    min_samples_leaf: int = Field(default=20, ge=1)
+    l2_regularization: float = Field(default=0.0, ge=0)
+    max_features: float = Field(default=1.0, gt=0, le=1.0)
+
+
+# Architectures trained by soamp.engine.tree_cv instead of the torch Trainer.
+TREE_ARCHITECTURES = frozenset({"hist_gradient_boosting_classifier"})
+KNOWN_ARCHITECTURES = ("baseline_classifier", "attention_fusion_classifier", *sorted(TREE_ARCHITECTURES))
+
+
 class ModelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -68,14 +87,12 @@ class ModelConfig(BaseModel):
     graph_encoder: GraphEncoderConfig = GraphEncoderConfig()
     baseline_classifier: BaselineClassifierConfig = BaselineClassifierConfig()
     attention_fusion_classifier: AttentionFusionClassifierConfig = AttentionFusionClassifierConfig()
+    hist_gradient_boosting_classifier: HistGradientBoostingClassifierConfig = HistGradientBoostingClassifierConfig()
 
     @model_validator(mode="after")
     def _architecture_must_be_known(self) -> "ModelConfig":
-        if self.architecture not in ("baseline_classifier", "attention_fusion_classifier"):
-            raise ValueError(
-                f"architecture must be 'baseline_classifier' or "
-                f"'attention_fusion_classifier', got {self.architecture!r}"
-            )
+        if self.architecture not in KNOWN_ARCHITECTURES:
+            raise ValueError(f"architecture must be one of {list(KNOWN_ARCHITECTURES)}, got {self.architecture!r}")
         return self
 
     def active_kwargs(self) -> dict:

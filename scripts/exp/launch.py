@@ -30,10 +30,19 @@ from soamp.runs.launcher import LaunchRefused, launch
 from soamp.runs.ledger import OPS_PROJECT, Ledger, WandbLedgerBackend
 from soamp.runs.plan import expand, request_hash
 from soamp.runs.request import ExperimentRequest
-from soamp.runs.vast import VastClient
+from soamp.runs.vast import VastClient, load_blocked_host_ids
 from soamp.utils.config import REPO_ROOT
 
 log = logging.getLogger("launch")
+
+
+def _request_from_manifest(experiment: str) -> ExperimentRequest:
+    """Rebuild the request of the latest launch of `experiment` from the W&B ledger."""
+    entity = os.environ.get("WANDB_ENTITY") or None
+    rows = [m for m in WandbLedgerBackend(entity).launches() if m.get("experiment") == experiment and m.get("request")]
+    if not rows:
+        raise LookupError(f"no launch manifest with a stored request for experiment {experiment!r}")
+    return ExperimentRequest(**max(rows, key=lambda m: m["created_at"])["request"])
 
 
 def _git_sha() -> str:
@@ -78,7 +87,7 @@ def _go(req: ExperimentRequest) -> int:
         return 2
     try:
         res = launch(
-            req, client=VastClient(), ledger=Ledger(WandbLedgerBackend(entity)), limits=load_limits(), cost_model=load_cost_model(),
+            req, client=VastClient(blocked_host_ids=load_blocked_host_ids()), ledger=Ledger(WandbLedgerBackend(entity)), limits=load_limits(), cost_model=load_cost_model(),
             finished=finished_run_names(req.experiment, entity), publish_bundle=_publish_bundle_factory(req.experiment, entity),
             data_ref=data_ref, entity=entity, wandb_api_key=key, git_sha=_git_sha(), repo_root=REPO_ROOT,
         )
@@ -97,15 +106,20 @@ def _go(req: ExperimentRequest) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("request", type=Path)
+    ap.add_argument("request", type=Path, nargs="?")
+    ap.add_argument("--retry", metavar="EXPERIMENT", help="re-launch an experiment's unfinished cells from its latest launch manifest in W&B (implies --go)")
     ap.add_argument("--plan", action="store_true", help="validate + estimate only (default)")
     ap.add_argument("--go", action="store_true", help="rent instances and start the run (checks all caps first)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
+    if args.retry:
+        args.go = True
+    elif args.request is None:
+        ap.error("a request file (or --retry EXPERIMENT) is required")
     try:
-        req = ExperimentRequest(**yaml.safe_load(args.request.read_text()))
-    except ValidationError as e:
+        req = _request_from_manifest(args.retry) if args.retry else ExperimentRequest(**yaml.safe_load(args.request.read_text()))
+    except (ValidationError, LookupError) as e:
         log.error("invalid request:\n%s", e)
         return 2
 

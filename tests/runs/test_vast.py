@@ -55,3 +55,29 @@ def test_list_instances_filters_to_soamp_labels():
 def test_bad_json_raises_vast_error():
     with pytest.raises(VastError):
         VastClient(FakeRunner({"show instances": "not json"})).list_instances()
+
+
+def test_blocked_hosts_are_never_offered():
+    raw = [dict(_offer(1, 0.999, 0.3), host_id=46431, machine_id=51069), dict(_offer(2, 0.99, 0.5), host_id=7, machine_id=8)]
+    r = FakeRunner({"search offers": json.dumps(raw)})
+    assert [o.id for o in VastClient(r, blocked_host_ids={46431}).search_offers(InstanceSpec())] == [2]
+    assert [o.id for o in VastClient(r).search_offers(InstanceSpec())] == [1, 2]
+
+
+def test_committed_blocklist_contains_the_known_bad_host():
+    from soamp.runs.vast import load_blocked_host_ids
+
+    assert 46431 in load_blocked_host_ids()
+
+
+def test_cli_runner_answers_the_destroy_confirmation(tmp_path, monkeypatch):
+    import subprocess
+    from soamp.runs.vast import cli_runner
+
+    seen = {}
+    def fake_run(cmd, **kw):
+        seen.update(kw)
+        return subprocess.CompletedProcess(cmd, 0, stdout="[]", stderr="")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    cli_runner("/bin/echo")(["destroy", "instance", "1"])
+    assert seen["input"] == "y\n"  # no tty in cloud/cron: the [y/N] prompt must be pre-answered

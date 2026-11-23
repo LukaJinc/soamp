@@ -65,7 +65,7 @@ def launch(
 
     running = len(client.list_instances())
     spend = ledger.spend_last_24h(now)
-    base_instance = InstanceSpec(max_hours=limits.max_hours_per_instance, grace_seconds=GRACE_SECONDS)
+    base_instance = InstanceSpec(gpu_name=req.gpu_name, max_hours=limits.max_hours_per_instance, grace_seconds=GRACE_SECONDS)
     offers = client.search_offers(base_instance, limit=8)
     if not offers:
         raise LaunchRefused("no vast.ai offers match the instance requirements")
@@ -82,7 +82,7 @@ def launch(
     # --- past this point money is spent: materialize files, then rent ---
     shards = shard(todo, est.n_instances)
     max_hours = min(limits.max_hours_per_instance, max(0.5, math.ceil(est.hours_per_instance * 2 * 10) / 10))
-    instance = InstanceSpec(max_hours=max_hours, grace_seconds=GRACE_SECONDS)
+    instance = InstanceSpec(gpu_name=req.gpu_name, max_hours=max_hours, grace_seconds=GRACE_SECONDS)
     extra: list[str] = [str(p) for p in write_cell_configs(req, todo, repo_root)]
     spec_paths: list[Path] = []
     for i, part in enumerate(shards):
@@ -114,6 +114,7 @@ def launch(
         experiment=req.experiment, request_hash=request_hash(req), created_at=now.isoformat(),
         deadline=deadline_for(now, max_hours=instance.max_hours, grace_seconds=instance.grace_seconds).isoformat(),
         estimate_usd=est.cost_usd, git_sha=git_sha, cells=[c.exp_id for c in cells], instance_ids=result.instance_ids,
+        request=req.model_dump(mode="json"),
     )
     ledger.record_launch(manifest)
     result.manifest, result.estimate_usd = manifest, est.cost_usd

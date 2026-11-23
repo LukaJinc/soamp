@@ -18,7 +18,10 @@ import subprocess
 from dataclasses import dataclass
 from typing import Callable
 
+import yaml
+
 from soamp.runs.spec import InstanceSpec, offer_query
+from soamp.utils.config import REPO_ROOT
 
 LABEL_PREFIX = "soamp-"
 Runner = Callable[[list[str]], str]
@@ -37,7 +40,9 @@ def cli_runner(binary: str | None = None) -> Runner:
     auth = ["--api-key", key] if key else []  # per-call, so nothing is written to ~/.config
 
     def run(args: list[str]) -> str:
-        p = subprocess.run([exe, *args, *auth, "--raw"], capture_output=True, text=True)
+        # `vastai destroy` asks "[y/N]" and aborts without a tty (seen live); answering "y" is
+        # harmless for every other command, which never reads stdin.
+        p = subprocess.run([exe, *args, *auth, "--raw"], capture_output=True, text=True, input="y\n")
         if p.returncode != 0:
             raise VastError(f"vastai {' '.join(args[:2])} failed rc={p.returncode}: {(p.stderr or p.stdout).strip()[:500]}")
         return p.stdout
@@ -53,6 +58,8 @@ class Offer:
     reliability: float
     inet_down_mbps: float
     location: str
+    host_id: int = 0
+    machine_id: int = 0
 
 
 @dataclass(frozen=True)
@@ -61,6 +68,7 @@ class VastInstance:
     label: str
     status: str  # vast `actual_status`: loading / running / exited ...
     price_per_hour: float
+    started_at: float | None = None  # unix seconds (vast `start_date`), None if unknown
 
 
 def _json(text: str, what: str):
@@ -70,9 +78,18 @@ def _json(text: str, what: str):
         raise VastError(f"could not parse `{what}` output as JSON: {text[:200]!r}") from e
 
 
+BLOCKED_HOSTS_PATH = "config/runs/blocked_hosts.yaml"
+
+
+def load_blocked_host_ids(path: str = BLOCKED_HOSTS_PATH) -> frozenset[int]:
+    f = REPO_ROOT / path
+    return frozenset(int(h) for h in (yaml.safe_load(f.read_text()) or {}).get("blocked_host_ids", [])) if f.is_file() else frozenset()
+
+
 class VastClient:
-    def __init__(self, runner: Runner | None = None):
+    def __init__(self, runner: Runner | None = None, blocked_host_ids: frozenset[int] | set[int] = frozenset()):
         self._run = runner or cli_runner()
+        self._blocked = frozenset(blocked_host_ids)
 
     def search_offers(self, instance: InstanceSpec, limit: int = 8) -> list[Offer]:
         """Most reliable first; price only breaks ties."""
@@ -81,9 +98,10 @@ class VastClient:
             Offer(
                 id=int(o["id"]), gpu_name=o["gpu_name"], price_per_hour=float(o["dph_total"]),
                 reliability=float(o["reliability2"]), inet_down_mbps=float(o["inet_down"]),
-                location=str(o.get("geolocation", "")),
+                location=str(o.get("geolocation", "")), host_id=int(o.get("host_id") or 0), machine_id=int(o.get("machine_id") or 0),
             )
             for o in raw
+            if int(o.get("host_id") or 0) not in self._blocked
         ]
         offers.sort(key=lambda o: (-o.reliability, o.price_per_hour))
         return offers[:limit]
@@ -112,6 +130,7 @@ class VastClient:
             VastInstance(
                 id=int(i["id"]), label=str(i.get("label") or ""), status=str(i.get("actual_status") or ""),
                 price_per_hour=float(i.get("dph_total") or 0.0),
+                started_at=float(i["start_date"]) if i.get("start_date") else None,
             )
             for i in raw
             if str(i.get("label") or "").startswith(label_prefix)

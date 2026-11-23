@@ -1,0 +1,8 @@
+# Thresholds for the codified "suspicious result" checks (soamp.analysis.facts). Starting values
+# from CLAUDE.md's dev findings; tune after the first real reports.
+fit_val_mcc_gap: 0.25            # fit MCC - val MCC at the final epoch above this => overfit
+val_loss_late_ratio: 1.10        # final val loss > min val loss x this, with the minimum before half the run => loss rises
+f1_drift_min_gain: 0.05          # F1@0.5 gain first->last snapshot above this ...
+matched_f1_max_gain: 0.02        # ... while matched-threshold F1 gains less than this => calibration drift, not learning
+fold_noise_mcc_std: 0.05         # val MCC std over folds above this => noisy, differences are fragile
+param_outlier_ratio: 10.0        # n_parameters > this x median of the other runs => informational

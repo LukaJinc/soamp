@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+import yaml
 
 from soamp.runs.budget import CostModel, Limits
 from soamp.runs.launcher import LaunchRefused, launch
@@ -23,6 +24,7 @@ class FakeClient(VastClient):
         self._offers = [Offer(100 + i, "RTX_4090", price, 0.999, 900, "DE") for i in range(offers)]
 
     def search_offers(self, instance, limit=8):
+        self.searched_gpu = instance.gpu_name
         return self._offers[:limit]
 
     def list_instances(self, label_prefix="soamp-"):
@@ -99,3 +101,22 @@ def test_refuses_before_renting_when_caps_hit(tmp_path):
 def test_refuses_without_offers(tmp_path):
     with pytest.raises(LaunchRefused, match="no vast.ai offers"):
         _go(tmp_path, client=FakeClient(offers=0))
+
+
+def test_gpu_defaults_to_a100_and_is_passed_to_search_and_spec(tmp_path):
+    res, client, _, published = _go(tmp_path)
+    assert client.searched_gpu == "A100_SXM4"
+    spec = yaml.safe_load((tmp_path / "config/vast/generated/unit_exp_0.yaml").read_text())
+    assert spec["instance"]["gpu_name"] == "A100_SXM4"
+
+
+def test_gpu_can_be_overridden_and_is_validated():
+    assert ExperimentRequest(**{**_req().model_dump(), "gpu_name": "RTX_4090"}).gpu_name == "RTX_4090"
+    with pytest.raises(Exception):
+        ExperimentRequest(**{**_req().model_dump(), "gpu_name": "RTX 4090; rm -rf"})
+
+
+def test_request_round_trips_through_the_manifest_so_a_retry_rebuilds_the_same_cells(tmp_path):
+    res, _, backend, _ = _go(tmp_path)
+    rebuilt = ExperimentRequest(**backend.rows[0]["request"])
+    assert [c.exp_id for c in expand(rebuilt)] == [c.exp_id for c in expand(_req())]

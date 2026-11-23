@@ -104,3 +104,39 @@ def test_written_configs_validate_against_train_config(tmp_path: Path):
         assert cfg.wandb_group == "unit_exp"
         assert cfg.model.architecture == cell.arch
         assert cfg.paths.data_dir.name == "dev"  # inherited from the dataset base config
+
+
+def test_tree_architecture_has_its_own_hparams_and_no_epochs_or_optimiser_fields():
+    req = _req(architectures=[{"name": "hist_gradient_boosting_classifier",
+                               "hparams": {"max_leaf_nodes": [15, 31], "learning_rate": [0.05, 0.1], "max_iter": 100}}])
+    cells = expand(req)
+    assert len(cells) == 2 * 2 * 2  # leaves x lr x 2 peptide representations
+    body = cells[0].config
+    assert body["model"]["architecture"] == "hist_gradient_boosting_classifier"
+    assert set(body["model"]["hist_gradient_boosting_classifier"]) == {"max_iter", "learning_rate", "max_leaf_nodes"}
+    assert "optim" not in body  # the tree's learning_rate is NOT the optimiser's
+    assert "epochs" not in body["loop"]
+    assert cells[0].exp_id.split("__")[1] == "hgb"
+    with pytest.raises(ValidationError, match="max_iter"):
+        _req(architectures=[{"name": "hist_gradient_boosting_classifier", "epochs": 10}])
+    with pytest.raises(ValidationError, match="hist_gradient_boosting_classifier"):
+        _req(architectures=[{"name": "hist_gradient_boosting_classifier", "hparams": {"projection_dim": 8}}])
+
+
+def test_tree_architecture_rejected_with_molgraph():
+    with pytest.raises(ValidationError, match="molgraph"):
+        _req(representations={"peptide": ["molgraph"], "organism": ["vocab"]},
+             architectures=[{"name": "hist_gradient_boosting_classifier"}])
+    assert expand(_req(representations={"peptide": ["molgraph"], "organism": ["vocab"]},
+                       architectures=[{"name": "baseline_classifier"}]))
+
+
+def test_tree_cell_config_validates_against_train_config(tmp_path):
+    shutil.copytree(REPO_ROOT / "config/train", tmp_path / "config/train", ignore=shutil.ignore_patterns("generated"))
+    req = _req(architectures=[{"name": "hist_gradient_boosting_classifier", "hparams": {"max_iter": 50, "learning_rate": 0.05}}])
+    cells = expand(req)
+    for p, cell in zip(write_cell_configs(req, cells, repo_root=tmp_path), cells):
+        cfg = load_config(tmp_path / p, TrainConfig)
+        assert cfg.model.architecture == "hist_gradient_boosting_classifier"
+        assert cfg.model.hist_gradient_boosting_classifier.max_iter == 50
+        assert cfg.model.hist_gradient_boosting_classifier.learning_rate == 0.05

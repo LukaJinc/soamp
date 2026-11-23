@@ -48,28 +48,55 @@ def build_run_spec(req: ExperimentRequest, cells: list[Cell], instance: Instance
     )
 
 
+_ONSTART = r"""
+set -u
+log() { echo "[onstart $(date -u +%H:%M:%S)] $*"; }
+for v in CONTAINER_ID CONTAINER_API_KEY; do
+  if [ -z "${!v:-}" ]; then
+    val=$(tr '\0' '\n' </proc/1/environ | sed -n "s/^$v=//p" | head -1)
+    [ -n "$val" ] && export "$v=$val"
+  fi
+done
+# Nothing below may leave a rented-but-idle instance behind: any failure destroys it.
+die() {
+  log "FATAL: $*; destroying instance ${CONTAINER_ID:-?}"
+  pip install -q vastai >/dev/null 2>&1
+  yes | vastai destroy instance "${CONTAINER_ID:-}" --api-key "${CONTAINER_API_KEY:-}"
+  exit 1
+}
+# Some hosts are blocked by W&B (api.wandb.ai answers 403 to everything): fail fast, cheaply.
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 https://api.wandb.ai/ || true)
+case "$code" in 403|000|"") die "api.wandb.ai unreachable from this host (http '$code')";; esac
+timeout 900 pip install -q '__WANDB_PIN__' || die "pip install wandb failed"
+timeout 900 python - <<'PY' || die "code bundle download failed"
+import os, tarfile, wandb
+d = wandb.Api().artifact(__CODE_REF__).download('/workspace/_code')
+os.makedirs(__WORKDIR_PY__, exist_ok=True)
+tarfile.open(os.path.join(d, 'code.tar.gz')).extractall(__WORKDIR_PY__)
+PY
+cd __WORKDIR__ || die "code bundle missing"
+# remote_main.sh owns the job timeout and its own destroy-on-exit trap from here on.
+SOAMP_DATA_ARTIFACT=__DATA_REF_Q__ setsid nohup bash scripts/vast/remote_main.sh __SPEC_Q__ __MAX_HOURS__ __GRACE__ </dev/null >/workspace/onstart.log 2>&1 &
+log "handed over to remote_main.sh"
+"""
+
+
 def build_onstart_cmd(
     *, code_artifact: str, data_artifact: str, spec_path: str, max_hours: float, grace_seconds: int
 ) -> str:
-    """Shell run by vast when the container starts. Secrets (WANDB_API_KEY, ...) come
-    from the container env set at create time, never from this string."""
-    fetch = (
-        "import os, tarfile, wandb; "
-        f"d = wandb.Api().artifact({code_artifact!r}).download('/workspace/_code'); "
-        f"os.makedirs({WORKDIR!r}, exist_ok=True); "
-        "tarfile.open(os.path.join(d, 'code.tar.gz')).extractall("
-        f"{WORKDIR!r})"
+    """Script vast runs when the container starts. Secrets (WANDB_API_KEY, ...) come from the
+    container env set at create time, never from this text. Every early failure destroys the
+    instance (see `die`), so a broken bootstrap cannot leave an idle instance billing."""
+    return (
+        _ONSTART.replace("__WANDB_PIN__", WANDB_PIN)
+        .replace("__CODE_REF__", repr(code_artifact))
+        .replace("__WORKDIR_PY__", repr(WORKDIR))
+        .replace("__WORKDIR__", WORKDIR)
+        .replace("__DATA_REF_Q__", shlex.quote(data_artifact))
+        .replace("__SPEC_Q__", shlex.quote(spec_path))
+        .replace("__MAX_HOURS__", str(max_hours))
+        .replace("__GRACE__", str(grace_seconds))
     )
-    steps = [
-        f"pip install -q {shlex.quote(WANDB_PIN)}",
-        f"python -c {shlex.quote(fetch)}",
-        f"cd {WORKDIR}",
-        # remote_main.sh downloads $SOAMP_DATA_ARTIFACT, installs the stack, runs the spec,
-        # uploads the status record and destroys the instance on exit.
-        f"SOAMP_DATA_ARTIFACT={shlex.quote(data_artifact)} setsid nohup bash scripts/vast/remote_main.sh "
-        f"{shlex.quote(spec_path)} {max_hours} {grace_seconds} </dev/null >/workspace/onstart.log 2>&1 &",
-    ]
-    return " && ".join(steps)
 
 
 def spec_path_for(experiment: str, shard_index: int) -> Path:

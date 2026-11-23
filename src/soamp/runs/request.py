@@ -17,6 +17,7 @@ own hyperparameter model, so a key from another architecture raises):
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -119,10 +120,30 @@ class AttentionFusionHParams(_HParams):
     _list_typed: ClassVar[frozenset[str]] = frozenset({"hidden_dims"})
 
 
-# architecture name -> (short tag used in run names, hyperparameter model)
-ARCHITECTURES: dict[str, tuple[str, type[_HParams]]] = {
-    "baseline_classifier": ("mlp", BaselineHParams),
-    "attention_fusion_classifier": ("attn", AttentionFusionHParams),
+class HistGradientBoostingHParams(_HParams):
+    """Tree model: has its OWN learning_rate (not the optimiser's), and `max_iter` rounds
+    instead of epochs."""
+
+    max_iter: int | list[int] | None = None
+    learning_rate: float | list[float] | None = None
+    max_leaf_nodes: int | list[int] | None = None
+    min_samples_leaf: int | list[int] | None = None
+    l2_regularization: float | list[float] | None = None
+    max_features: float | list[float] | None = None
+
+
+@dataclass(frozen=True)
+class ArchSpec:
+    tag: str  # short name used in run names
+    hparams_cls: type[_HParams]
+    uses_common: bool = True  # shares optim.learning_rate/weight_decay + loop.batch_size/epochs
+    vector_only: bool = False  # cannot consume the molecular_graph peptide input
+
+
+ARCHITECTURES: dict[str, ArchSpec] = {
+    "baseline_classifier": ArchSpec("mlp", BaselineHParams),
+    "attention_fusion_classifier": ArchSpec("attn", AttentionFusionHParams),
+    "hist_gradient_boosting_classifier": ArchSpec("hgb", HistGradientBoostingHParams, uses_common=False, vector_only=True),
 }
 COMMON_FIELDS = tuple(CommonHParams.model_fields)
 
@@ -142,26 +163,35 @@ class ArchitectureRequest(BaseModel):
             raise ValueError(f"unknown architecture {v!r}; known: {sorted(ARCHITECTURES)}")
         return v
 
+    def _split(self) -> tuple[dict, dict]:
+        """(common optimiser fields, architecture-specific fields)."""
+        if not ARCHITECTURES[self.name].uses_common:
+            return {}, dict(self.hparams)
+        return (
+            {k: v for k, v in self.hparams.items() if k in COMMON_FIELDS},
+            {k: v for k, v in self.hparams.items() if k not in COMMON_FIELDS},
+        )
+
     @model_validator(mode="after")
     def _validate_hparams(self) -> "ArchitectureRequest":
-        _, arch_cls = ARCHITECTURES[self.name]
-        common = {k: v for k, v in self.hparams.items() if k in COMMON_FIELDS}
-        specific = {k: v for k, v in self.hparams.items() if k not in COMMON_FIELDS}
+        spec = ARCHITECTURES[self.name]
+        if not spec.uses_common and self.epochs is not None:
+            raise ValueError(f"architecture {self.name!r} has no epochs; set hparams.max_iter (boosting rounds) instead")
+        common, specific = self._split()
         # extra="forbid" on both models turns a foreign/typo'd key into an error that
         # names the architecture, instead of silently dropping it.
         try:
             CommonHParams(**common)
-            arch_cls(**specific)
+            spec.hparams_cls(**specific)
         except Exception as e:
             raise ValueError(f"hparams invalid for architecture {self.name!r}: {e}") from e
         return self
 
     def common(self) -> CommonHParams:
-        return CommonHParams(**{k: v for k, v in self.hparams.items() if k in COMMON_FIELDS})
+        return CommonHParams(**self._split()[0])
 
     def specific(self) -> _HParams:
-        _, arch_cls = ARCHITECTURES[self.name]
-        return arch_cls(**{k: v for k, v in self.hparams.items() if k not in COMMON_FIELDS})
+        return ARCHITECTURES[self.name].hparams_cls(**self._split()[1])
 
 
 class Representations(BaseModel):
@@ -195,6 +225,9 @@ class ExperimentRequest(BaseModel):
     architectures: list[ArchitectureRequest]
     sampling: Sampling = Sampling()
     snapshot_every_n_epochs: int | None = 2
+    # vast.ai GPU. Default = the class every earlier successful vast run used (config/vast/dev_*.yaml);
+    # a consumer RTX 4090 host answered 403 on api.wandb.ai (2026-11-22), so cheaper cards are opt-in.
+    gpu_name: str = "A100_SXM4"
     # Optional baseline run name for the analysis step to compare against.
     baseline_run: str | None = None
 
@@ -203,6 +236,13 @@ class ExperimentRequest(BaseModel):
     def _slug(cls, v: str) -> str:
         if not _SLUG.match(v):
             raise ValueError("experiment must be a lowercase slug (a-z, 0-9, _ or -; 3-49 chars)")
+        return v
+
+    @field_validator("gpu_name")
+    @classmethod
+    def _gpu_token(cls, v: str) -> str:
+        if not re.fullmatch(r"[A-Za-z0-9_]{2,32}", v):  # goes into a vast.ai search query string
+            raise ValueError("gpu_name must be a vast.ai GPU token like A100_SXM4 or RTX_4090")
         return v
 
     @field_validator("cv")
@@ -225,6 +265,10 @@ class ExperimentRequest(BaseModel):
                 raise ValueError(f"organism representation {o!r} not available for dataset {self.dataset!r}; have {sorted(ds['organism'])}")
         if not self.architectures:
             raise ValueError("at least one architecture is required")
+        if "molgraph" in self.representations.peptide:
+            bad = [a.name for a in self.architectures if ARCHITECTURES[a.name].vector_only]
+            if bad:
+                raise ValueError(f"architecture(s) {bad} need a vector peptide representation, not molgraph")
         if not self.seeds:
             raise ValueError("at least one seed is required")
         return self

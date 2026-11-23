@@ -73,7 +73,8 @@ def _cell_body(req: ExperimentRequest, arch: str, combo: dict, pep: str, org: st
     ds = DATASETS[req.dataset]
     feat, scaler, pep_method = ds["peptide"][pep]
     vocab, org_method = ds["organism"][org]
-    arch_fields = {k: v for k, v in combo.items() if k in ARCHITECTURES[arch][1].model_fields}
+    spec = ARCHITECTURES[arch]
+    arch_fields = {k: v for k, v in combo.items() if k in spec.hparams_cls.model_fields}
     body: dict = {
         "input_files": {
             "peptide_features_filename": feat,
@@ -86,11 +87,11 @@ def _cell_body(req: ExperimentRequest, arch: str, combo: dict, pep: str, org: st
         "wandb_group": req.experiment,
         "wandb_tags": [f"{req.dataset}_dataset", pep_method, org_method, arch, "cv", f"req_{rhash}"],
     }
-    optim = {k: combo[k] for k in ("learning_rate", "weight_decay") if k in combo}
+    optim = {k: combo[k] for k in ("learning_rate", "weight_decay") if k in combo and spec.uses_common}
     if optim:
         body["optim"] = optim
     for k in ("epochs", "batch_size"):
-        if k in combo:
+        if k in combo and spec.uses_common:
             body["loop"][k] = combo[k]
     return body
 
@@ -100,7 +101,7 @@ def expand(req: ExperimentRequest) -> list[Cell]:
     rhash = request_hash(req)
     cells: dict[str, Cell] = {}
     for a in req.architectures:
-        tag = ARCHITECTURES[a.name][0]
+        tag = ARCHITECTURES[a.name].tag
         for combo, pep, org, seed in product(
             _arch_combos(a), req.representations.peptide, req.representations.organism, req.seeds
         ):

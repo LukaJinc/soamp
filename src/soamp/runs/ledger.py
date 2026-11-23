@@ -36,6 +36,8 @@ class Manifest:
     git_sha: str
     cells: list[str]  # expected W&B run names (exp_ids)
     instance_ids: list[int] = field(default_factory=list)
+    # The validated request (ExperimentRequest.model_dump), so a retry can be rebuilt from W&B alone.
+    request: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)
