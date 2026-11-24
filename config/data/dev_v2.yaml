@@ -1,0 +1,35 @@
+# Dev v2: seven strains, MIC recomputed from concentration (ug/ml), NA rows inactive, and the
+# test + 5-fold split rebuilt from the sequence/Murcko clusters over the labelled pairs.
+# Run order: pipeline/data/04_recompute_mic.py, then pipeline/data/03_build_dev_classification_dataset.py
+# with this config. Writes only under data/dev_v2/ and reports/dev_v2/; data/dev/ is untouched.
+_base_: dev.yaml
+
+paths:
+  processed_parquet: data/dev_v2/dbaasp_dev_recomputed.parquet   # output of 04_recompute_mic.py
+  cluster_parquet: data/dev/dbaasp_dev_split_v2.parquet          # clusters only (identity 0.8, D->L; Murcko for non-linear)
+  split_parquet: data/dev_v2/dbaasp_dev_split_final.parquet      # OUTPUT here (computed from the clusters)
+  out_dir: data/dev_v2
+  reports_dir: reports/dev_v2
+
+target_organisms:
+  - Escherichia coli ATCC 25922
+  - Staphylococcus aureus ATCC 25923
+  - Pseudomonas aeruginosa ATCC 27853
+  - Acinetobacter baumannii ATCC 19606
+  - Klebsiella pneumoniae ATCC 700603
+  - Enterococcus faecalis ATCC 29212
+  - Bacillus subtilis ATCC 6633
+
+measure: MIC
+value_column: mic_ug_ml     # recomputed from concentration; DBAASP's `activity` is not used
+direction_column: direction
+include_na_rows: true       # NA rows (sentinel 1,111,111, measure '-' or empty) -> inactive
+
+# stratified cluster -> bucket search over the labelled pairs: size, non-linear share, active share
+bucketing:
+  test_size: 0.2
+  n_folds: 5
+  lambda_noncanonical: 30.0
+  lambda_active: 30.0
+  n_iterations: 100000
+  seed: 42

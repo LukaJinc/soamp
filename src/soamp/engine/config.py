@@ -75,8 +75,25 @@ class HistGradientBoostingClassifierConfig(BaseModel):
     max_features: float = Field(default=1.0, gt=0, le=1.0)
 
 
+class XGBoostClassifierConfig(BaseModel):
+    """XGBoost (tree_method=hist, CPU) hyperparameters. One boosting round = one 'epoch' in the
+    logged curves, so loop.epochs is ignored; ``n_estimators`` is the number of rounds."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    n_estimators: int = Field(default=300, ge=1)
+    learning_rate: float = Field(default=0.1, gt=0)
+    max_depth: int = Field(default=6, ge=1, le=16)
+    min_child_weight: float = Field(default=1.0, ge=0)
+    reg_lambda: float = Field(default=1.0, ge=0)
+    reg_alpha: float = Field(default=0.0, ge=0)
+    gamma: float = Field(default=0.0, ge=0)
+    subsample: float = Field(default=1.0, gt=0, le=1.0)
+    colsample_bytree: float = Field(default=1.0, gt=0, le=1.0)
+
+
 # Architectures trained by soamp.engine.tree_cv instead of the torch Trainer.
-TREE_ARCHITECTURES = frozenset({"hist_gradient_boosting_classifier"})
+TREE_ARCHITECTURES = frozenset({"hist_gradient_boosting_classifier", "xgboost_classifier"})
 KNOWN_ARCHITECTURES = ("baseline_classifier", "attention_fusion_classifier", *sorted(TREE_ARCHITECTURES))
 
 
@@ -88,6 +105,7 @@ class ModelConfig(BaseModel):
     baseline_classifier: BaselineClassifierConfig = BaselineClassifierConfig()
     attention_fusion_classifier: AttentionFusionClassifierConfig = AttentionFusionClassifierConfig()
     hist_gradient_boosting_classifier: HistGradientBoostingClassifierConfig = HistGradientBoostingClassifierConfig()
+    xgboost_classifier: XGBoostClassifierConfig = XGBoostClassifierConfig()
 
     @model_validator(mode="after")
     def _architecture_must_be_known(self) -> "ModelConfig":

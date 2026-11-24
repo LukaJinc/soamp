@@ -1,0 +1,6 @@
+# Dev-split clustering v2: every D-residue is mapped to its L-form before alignment,
+# identity threshold 0.8 (was 0.6). Written to NEW files; the v1 split stays untouched.
+_base_: dev.yaml
+identity_threshold: 0.8
+d_residues: map_to_L
+split_output: data/dev/dbaasp_dev_split_v2.parquet

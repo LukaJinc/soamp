@@ -12,12 +12,27 @@ the analysis step needs no per-architecture code:
   * a boosting round plays the role of an epoch: ``on_epoch_end`` fires once per
     round and snapshots fire after rounds N, 2N, ... and the last one.
 
-Model: scikit-learn's HistGradientBoostingClassifier (histogram gradient boosting,
-the LightGBM/XGBoost algorithm family). It is already a pinned dependency, needs no
-system OpenMP library and gives per-round scores via ``staged_decision_function``.
+Two model families share this path (``TREE_ARCHITECTURES``):
+
+  * ``hist_gradient_boosting_classifier`` -- scikit-learn's HistGradientBoostingClassifier:
+    a pinned dependency that needs no system OpenMP library and gives per-round scores
+    via ``staged_decision_function``;
+  * ``xgboost_classifier`` -- XGBoost (``tree_method="hist"``, CPU), fitted and scored in an
+    isolated worker process (``xgb_worker.py``): its OpenMP runtime collides with torch's and
+    scikit-learn's in one process on macOS (segfault / hang), and this way this process never
+    imports xgboost. Per-round raw margins are log-odds, base score included.
+
+Each family is wrapped in a tiny adapter (``fit_tree`` -> object with ``n_rounds``,
+``staged_logits(name)`` and ``logits(name)`` for the matrices handed to it); everything after the
+adapter is shared.
 """
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
 from typing import Callable
 
 import numpy as np
@@ -30,8 +45,79 @@ from soamp.engine.class_balancing import resolve_pos_weight
 from soamp.engine.metrics import compute_binary_metrics, logits_to_predictions
 
 
+HGB = "hist_gradient_boosting_classifier"
+XGB = "xgboost_classifier"
+_XGB_WORKER = Path(__file__).with_name("xgb_worker.py")   # see that file for why XGBoost runs in its own process
+
+
 class TreeModelError(ValueError):
     """Raised for inputs a tree model cannot use (e.g. graph peptide input)."""
+
+
+class _FittedTree:
+    """A fitted boosting model together with the matrices it will be asked to score, by name."""
+
+    n_rounds: int
+
+    def staged_logits(self, name: str):
+        """Yield the raw log-odds of set ``name`` after round 1, 2, ..., n_rounds."""
+        raise NotImplementedError
+
+    def logits(self, name: str) -> np.ndarray:
+        raise NotImplementedError
+
+
+class _FittedHGB(_FittedTree):
+    def __init__(self, model: HistGradientBoostingClassifier, sets: dict[str, np.ndarray]):
+        self.model, self.sets, self.n_rounds = model, sets, int(model.n_iter_)
+
+    def staged_logits(self, name):
+        return self.model.staged_decision_function(self.sets[name])
+
+    def logits(self, name):
+        return np.asarray(self.model.decision_function(self.sets[name]), dtype=float)
+
+
+class _FittedXGB(_FittedTree):
+    """Holds what the isolated worker computed (the model itself never enters this process)."""
+
+    def __init__(self, out: dict[str, np.ndarray]):
+        self.out, self.n_rounds = out, int(out["n_rounds"])
+
+    def staged_logits(self, name):
+        return iter(self.out[f"staged_{name}"])
+
+    def logits(self, name):
+        return self.out[f"final_{name}"]
+
+
+def _run_xgb_worker(params: dict, seed: int, x: np.ndarray, y: np.ndarray, w, sets: dict[str, np.ndarray]) -> dict:
+    with tempfile.TemporaryDirectory(prefix="soamp_xgb_") as tmp:
+        d = Path(tmp)
+        (d / "job.json").write_text(json.dumps({"params": params, "seed": int(seed)}))
+        np.savez(d / "train.npz", x=x, y=y, **({} if w is None else {"w": np.asarray(w, dtype=float)}))
+        np.savez(d / "sets.npz", **sets)
+        proc = subprocess.run([sys.executable, str(_XGB_WORKER), str(d)], capture_output=True, text=True)
+        if proc.returncode != 0:
+            tail = (proc.stderr or proc.stdout).strip().splitlines()[-6:]
+            if any("No module named 'xgboost'" in line for line in tail):
+                raise TreeModelError(f"architecture {XGB!r} needs the xgboost package (on macOS also libomp): {tail[-1]}")
+            raise TreeModelError(f"xgboost worker failed (exit {proc.returncode}): " + " | ".join(tail))
+        with np.load(d / "out.npz") as out:
+            return {k: out[k] for k in out.files}   # read fully: the temp dir disappears on exit
+
+
+def fit_tree(architecture: str, params: dict, x: np.ndarray, y: np.ndarray, sample_weight, seed: int,
+             sets: dict[str, np.ndarray]) -> _FittedTree:
+    """Fit one boosting model of the requested family (no early stopping: every round counts) and
+    make ``sets`` (name -> matrix) scoreable by name."""
+    if architecture == HGB:
+        model = HistGradientBoostingClassifier(**params, early_stopping=False, random_state=seed)
+        model.fit(x, y, sample_weight=sample_weight)
+        return _FittedHGB(model, sets)
+    if architecture == XGB:
+        return _FittedXGB(_run_xgb_worker(params, seed, x, y, sample_weight, sets))
+    raise TreeModelError(f"unknown tree architecture {architecture!r}; known: {[HGB, XGB]}")
 
 
 def weighted_bce_from_logits(logits: np.ndarray, labels: np.ndarray, pos_weight: float | None) -> float:
@@ -62,8 +148,11 @@ def dataset_to_matrix(dataset, *, organism_vocab_size: int | None, organism_outp
     return np.hstack([peptide_x, organism_x]), np.asarray(labels, dtype=int)
 
 
-def count_tree_parameters(params: dict) -> int:
-    """Upper bound on leaves (rounds x max leaves) -- the tree analogue of n_parameters."""
+def count_tree_parameters(params: dict, architecture: str = HGB) -> int:
+    """Upper bound on leaves (rounds x max leaves per tree) -- the tree analogue of n_parameters.
+    HGB: ``max_iter * max_leaf_nodes``; XGBoost: ``n_estimators * 2**max_depth``."""
+    if architecture == XGB:
+        return int(params["n_estimators"]) * 2 ** int(params["max_depth"])
     return int(params["max_iter"]) * int(params["max_leaf_nodes"])
 
 
@@ -75,6 +164,7 @@ def train_and_evaluate_fold_tree(
     peptide_method: str,
     organism_method: str,
     params: dict,
+    architecture: str = HGB,
     peptide_method_kwargs: dict | None = None,
     organism_method_kwargs: dict | None = None,
     class_balancing_mode: str = "auto",
@@ -97,9 +187,8 @@ def train_and_evaluate_fold_tree(
     pos_weight = resolve_pos_weight(class_balancing_mode, class_balancing_fixed_pos_weight, [LABEL_TO_INT[r["label"]] for r in row_groups["fit"]])
     sample_weight = np.where(y_fit == 1, pos_weight, 1.0) if pos_weight is not None else None
 
-    model = HistGradientBoostingClassifier(**params, early_stopping=False, random_state=seed)
-    model.fit(x_fit, y_fit, sample_weight=sample_weight)
-    n_rounds = int(model.n_iter_)
+    model = fit_tree(architecture, params, x_fit, y_fit, sample_weight, seed, {g: m[0] for g, m in mats.items()})
+    n_rounds = model.n_rounds
 
     snapshot_enabled = snapshot_every_n_epochs is not None and on_snapshot is not None
     if snapshot_enabled:
@@ -112,8 +201,8 @@ def train_and_evaluate_fold_tree(
 
     if on_epoch_end is not None or snapshot_enabled:
         x_val, y_val = mats["val"]
-        # staged_decision_function yields the raw log-odds after each boosting round
-        for k, (fit_z, val_z) in enumerate(zip(model.staged_decision_function(x_fit), model.staged_decision_function(x_val)), start=1):
+        # the raw log-odds after each boosting round (same unit for both families)
+        for k, (fit_z, val_z) in enumerate(zip(model.staged_logits("fit"), model.staged_logits("val")), start=1):
             if on_epoch_end is not None:
                 vm = compute_binary_metrics(val_z, y_val)
                 on_epoch_end({
@@ -140,7 +229,7 @@ def train_and_evaluate_fold_tree(
     metrics_by_group, frames = {}, []
     for group in eval_groups:
         x, y = mats[group]
-        logits = np.asarray(model.decision_function(x), dtype=float)
+        logits = model.logits(group)
         metrics_by_group[group] = compute_binary_metrics(logits, y)
         df = pd.DataFrame(row_groups[group]).reset_index(drop=True)
         df["true_label_int"] = y.astype(int)

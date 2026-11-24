@@ -1,0 +1,20 @@
+# Dev-split clustering baseline: identity 0.6, D-residues kept apart (the method of the
+# first dev split), on the seven target strains of scripts/EDA/09_data_processing.ipynb.
+# Used as the comparison point for dev_v2.yaml. The very first dev split
+# (data/dev/dbaasp_dev_split.parquet) covered only the first three strains; it is never overwritten.
+organisms:
+  - Escherichia coli ATCC 25922
+  - Staphylococcus aureus ATCC 25923
+  - Pseudomonas aeruginosa ATCC 27853
+  - Acinetobacter baumannii ATCC 19606
+  - Klebsiella pneumoniae ATCC 700603
+  - Enterococcus faecalis ATCC 29212
+  - Bacillus subtilis ATCC 6633
+identity_threshold: 0.6
+hard_link_identity: 0.9
+gap_open: 5
+gap_extension: 1
+d_residues: separate
+leiden_seed: 42
+leiden_iterations: -1
+split_output: data/dev/dbaasp_dev_split_v1_7org.parquet

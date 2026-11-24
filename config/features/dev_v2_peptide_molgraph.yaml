@@ -1,0 +1,7 @@
+# Molecular-graph peptide representation (scaler stub only) for the dev v2 dataset (data/dev_v2/: seven strains, MIC recomputed from
+# concentration). Same method as peptide_molgraph.yaml; only the data dir moves.
+_base_: peptide_molgraph.yaml
+
+paths:
+  data_dir: data/dev_v2
+  reports_dir: reports/dev_v2   # keep dev v2 logs apart from the older runs

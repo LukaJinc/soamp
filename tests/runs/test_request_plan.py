@@ -103,7 +103,7 @@ def test_written_configs_validate_against_train_config(tmp_path: Path):
         assert cfg.exp_id == cell.exp_id
         assert cfg.wandb_group == "unit_exp"
         assert cfg.model.architecture == cell.arch
-        assert cfg.paths.data_dir.name == "dev"  # inherited from the dataset base config
+        assert cfg.paths.data_dir.name == "dev_v2"  # the default dataset's base config
 
 
 def test_tree_architecture_has_its_own_hparams_and_no_epochs_or_optimiser_fields():
@@ -140,3 +140,88 @@ def test_tree_cell_config_validates_against_train_config(tmp_path):
         assert cfg.model.architecture == "hist_gradient_boosting_classifier"
         assert cfg.model.hist_gradient_boosting_classifier.max_iter == 50
         assert cfg.model.hist_gradient_boosting_classifier.learning_rate == 0.05
+
+
+# ---- dataset default + the dev_v2 registry entry ---------------------------------------------
+
+def test_default_dataset_is_the_seven_strain_dev_v2_and_dev_stays_selectable():
+    assert _req().dataset == "dev_v2"
+    assert _req(dataset="dev").dataset == "dev"
+    assert ExperimentRequest.model_fields["dataset"].default == "dev_v2"
+
+
+@pytest.mark.parametrize("dataset,folder", [("dev", "dev"), ("dev_v2", "dev_v2")])
+def test_cells_of_each_dataset_inherit_their_own_data_dir(tmp_path, dataset, folder):
+    shutil.copytree(REPO_ROOT / "config/train", tmp_path / "config/train", ignore=shutil.ignore_patterns("generated"))
+    req = _req(dataset=dataset)
+    cells = expand(req)
+    for p in write_cell_configs(req, cells, repo_root=tmp_path):
+        cfg = load_config(tmp_path / p, TrainConfig)
+        assert cfg.paths.data_dir.name == folder
+    assert all(f"{dataset}_dataset" in c.config["wandb_tags"] for c in cells)
+
+
+def test_registry_entries_are_self_consistent():
+    from soamp.runs.launch_plan import data_files
+    from soamp.runs.request import DATASETS
+
+    for name, ds in DATASETS.items():
+        folder = f"data/{name}/"
+        assert all(f.startswith(folder) for f in ds["required_artifacts"]), name
+        files = data_files(name)
+        assert files[: len(ds["required_artifacts"])] == ds["required_artifacts"]
+        assert all(f.startswith(folder) for f in files), f"{name} ships a file from another dataset"
+        for group, kinds in ds["prepare"].items():           # every prepare step builds a listed representation file
+            for kind, steps in kinds.items():
+                listed = ds[group][kind]
+                for _cmd, produces in steps:
+                    assert all(p.rsplit("/", 1)[1] in listed for p in produces), (name, kind, produces)
+                    assert all(p.startswith(folder) for p in produces)
+        for _cmd, _prod in (s for kinds in ds["prepare"].values() for steps in kinds.values() for s in steps):
+            cfg = next(a for a in _cmd if a.startswith("config/features/"))
+            assert (REPO_ROOT / cfg).is_file(), f"{name}: missing feature config {cfg}"
+        assert (REPO_ROOT / "config/train" / ds["base_config"]).is_file()
+
+
+def test_dev_v2_data_artifact_lists_every_cached_feature_file():
+    from soamp.runs.launch_plan import data_files
+
+    assert data_files("dev_v2") == [
+        "data/dev_v2/mic_classification_dataset.csv", "data/dev_v2/peptide_split.csv",
+        "data/dev_v2/peptide_features_rdkit.csv", "data/dev_v2/peptide_feature_scaler_rdkit.json",
+        "data/dev_v2/peptide_features_peptideclm.csv", "data/dev_v2/peptide_feature_scaler_peptideclm.json",
+        "data/dev_v2/peptide_feature_scaler_molgraph.json", "data/dev_v2/organism_vocab_vocab_embedding.json",
+    ]
+
+
+# ---- XGBoost architecture ---------------------------------------------------------------------
+
+def test_xgboost_architecture_has_its_own_hparams_and_no_epochs_or_optimiser_fields():
+    req = _req(architectures=[{"name": "xgboost_classifier",
+                               "hparams": {"max_depth": [4, 6], "learning_rate": [0.05, 0.1], "n_estimators": 100}}])
+    cells = expand(req)
+    assert len(cells) == 2 * 2 * 2  # depth x lr x 2 peptide representations
+    body = cells[0].config
+    assert body["model"]["architecture"] == "xgboost_classifier"
+    assert set(body["model"]["xgboost_classifier"]) == {"n_estimators", "learning_rate", "max_depth"}
+    assert "optim" not in body and "epochs" not in body["loop"]
+    assert cells[0].exp_id.split("__")[1] == "xgb"
+    with pytest.raises(ValidationError, match="n_estimators"):
+        _req(architectures=[{"name": "xgboost_classifier", "epochs": 10}])
+    with pytest.raises(ValidationError, match="xgboost_classifier"):
+        _req(architectures=[{"name": "xgboost_classifier", "hparams": {"max_iter": 8}}])      # an HGB-only key
+    with pytest.raises(ValidationError, match="hist_gradient_boosting_classifier"):
+        _req(architectures=[{"name": "hist_gradient_boosting_classifier", "hparams": {"max_depth": 3}}])  # and back
+
+
+def test_xgboost_rejected_with_molgraph_and_cell_config_validates(tmp_path):
+    with pytest.raises(ValidationError, match="molgraph"):
+        _req(representations={"peptide": ["molgraph"], "organism": ["vocab"]}, architectures=[{"name": "xgboost_classifier"}])
+    shutil.copytree(REPO_ROOT / "config/train", tmp_path / "config/train", ignore=shutil.ignore_patterns("generated"))
+    req = _req(architectures=[{"name": "xgboost_classifier", "hparams": {"n_estimators": 50, "max_depth": 4, "subsample": 0.8}}])
+    cells = expand(req)
+    for p in write_cell_configs(req, cells, repo_root=tmp_path):
+        cfg = load_config(tmp_path / p, TrainConfig)
+        assert cfg.model.architecture == "xgboost_classifier"
+        assert (cfg.model.xgboost_classifier.n_estimators, cfg.model.xgboost_classifier.max_depth,
+                cfg.model.xgboost_classifier.subsample) == (50, 4, 0.8)

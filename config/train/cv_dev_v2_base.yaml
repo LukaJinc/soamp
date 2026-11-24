@@ -1,0 +1,18 @@
+# Base for every generated cell on the dev v2 dataset (data/dev_v2/: seven target strains, MIC
+# recomputed from concentration in ug/ml, NA rows inactive, test + 5 folds from the v2 clusters;
+# docs/dev_dataset_v2.md). Cells written by soamp.runs.plan inherit this via `_base_` and add their
+# own representation files, architecture and hyperparameters.
+_base_: cv_dev_peptideclm_vocab.yaml
+
+exp_id: dev_v2_base
+
+paths:
+  data_dir: data/dev_v2
+
+# DBAASP 25/100 cutoffs (all seven strains are in the table) apply to the RECOMPUTED ug/ml value.
+thresholds_csv: config/thresholds/dev_dbaasp_thresholds.csv
+threshold_unit: "µg/ml (recomputed from concentration)"
+
+wandb_group: dev_v2
+wandb_tags:
+  - dev_v2_dataset

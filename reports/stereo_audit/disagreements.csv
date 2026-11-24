@@ -1,0 +1,220 @@
+peptide_id,position,char,token,residue_class,case_stereo,name_stereo,notation_stereo,smiles_stereo_corn,smiles_stereo_template,why
+6578,4.0,X,D-Me-Phe,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+6578,11.0,X,D-Me-Ala,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+7420,1.0,x,D-LAP,nonstandard,D,D,D,L,undetermined,notation!=smiles_corn;
+7420,3.0,Y,Y,standard,L,,L,D,undetermined,notation!=smiles_corn;
+7420,4.0,n,N,standard,D,,D,achiral,undetermined,notation!=smiles_corn;
+7420,5.0,G,G,standard,L,,achiral,L,undetermined,notation!=smiles_corn;
+7420,8.0,N,N,standard,L,,L,D,D,notation!=smiles_corn;
+17258,4.0,X,D-2-NAL,nonstandard,L,D,undetermined,D,D,notation_case!=notation_name;
+19565,2.0,x,O-Me-D-Tyr,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+19565,5.0,x,O-Me-D-Tyr,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+19999,1.0,x,βALA,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+6579,4.0,X,D-Me-Phe,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+6579,11.0,X,D-Me-Ala,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+7421,1.0,x,D-LAP,nonstandard,D,D,D,L,undetermined,notation!=smiles_corn;
+7421,2.0,S,S,standard,L,,L,D,undetermined,notation!=smiles_corn;
+7421,4.0,n,N,standard,D,,D,achiral,undetermined,notation!=smiles_corn;
+7421,5.0,G,G,standard,L,,achiral,L,undetermined,notation!=smiles_corn;
+7421,8.0,N,N,standard,L,,L,D,D,notation!=smiles_corn;
+10617,10.0,x,cis-4-D-Hyp,nonstandard,D,L,undetermined,D,D,notation_case!=notation_name;
+17259,4.0,X,β-Thi-D-Ala,nonstandard,L,L,L,D,D,notation!=smiles_corn;
+19080,2.0,x,cis-4-D-Hyp,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+19735,1.0,X,D-Allo-Thr,nonstandard,L,D,undetermined,D,D,notation_case!=notation_name;
+6580,4.0,X,D-Me-Phe,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+6580,11.0,X,D-Me-Ala,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+7422,3.0,Y,Y,standard,L,,L,D,undetermined,notation!=smiles_corn;
+7422,4.0,n,N,standard,D,,D,achiral,undetermined,notation!=smiles_corn;
+7422,5.0,G,G,standard,L,,achiral,L,undetermined,notation!=smiles_corn;
+5433,8.0,X,D-CF3-Bpg,nonstandard,L,D,undetermined,D,D,notation_case!=notation_name;
+7423,2.0,s,S,standard,D,,D,L,undetermined,notation!=smiles_corn;
+7423,3.0,Y,Y,standard,L,,L,D,undetermined,notation!=smiles_corn;
+7423,4.0,n,N,standard,D,,D,achiral,undetermined,notation!=smiles_corn;
+7423,5.0,G,G,standard,L,,achiral,L,undetermined,notation!=smiles_corn;
+7423,8.0,N,N,standard,L,,L,D,D,notation!=smiles_corn;
+22830,1.0,x,D-MET(O),nonstandard,D,D,D,L,L,notation!=smiles_corn;
+6582,4.0,X,D-Me-Phe,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+6582,11.0,X,D-Me-Ala,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+7424,2.0,S,S,standard,L,,L,D,undetermined,notation!=smiles_corn;
+7424,4.0,n,N,standard,D,,D,achiral,undetermined,notation!=smiles_corn;
+7424,5.0,G,G,standard,L,,achiral,L,undetermined,notation!=smiles_corn;
+11142,6.0,x,"N,N-Me-D-Orn",nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+5181,10.0,x,4-NH2-D-Pro,nonstandard,D,L,undetermined,D,D,notation_case!=notation_name;
+5435,12.0,X,D-CF3-Bpg,nonstandard,L,D,undetermined,D,D,notation_case!=notation_name;
+7425,4.0,n,N,standard,D,,D,achiral,undetermined,notation!=smiles_corn;
+7425,5.0,G,G,standard,L,,achiral,L,undetermined,notation!=smiles_corn;
+7425,8.0,N,N,standard,L,,L,D,D,notation!=smiles_corn;
+11143,6.0,x,"N,N,N-Me-D-Orn",nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+14528,10.0,X,D-HPhe,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+22198,1.0,x,2-HYP,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+25331,3.0,X,D-1-NAL,nonstandard,L,D,undetermined,D,D,notation_case!=notation_name;
+7426,1.0,X,LAP,nonstandard,L,L,L,D,undetermined,notation!=smiles_corn;
+7426,2.0,s,S,standard,D,,D,L,undetermined,notation!=smiles_corn;
+7426,3.0,Y,Y,standard,L,,L,D,undetermined,notation!=smiles_corn;
+7426,4.0,n,N,standard,D,,D,achiral,undetermined,notation!=smiles_corn;
+7426,5.0,G,G,standard,L,,achiral,L,undetermined,notation!=smiles_corn;
+11144,6.0,x,MOR-D-Orn,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+22152,3.0,x,cis-4-D-Hyp,nonstandard,D,L,undetermined,D,D,notation_case!=notation_name;
+5437,14.0,X,D-CF3-Bpg,nonstandard,L,D,undetermined,D,D,notation_case!=notation_name;
+6915,7.0,X,D-Allo-Thr,nonstandard,L,D,undetermined,D,D,notation_case!=notation_name;
+7427,1.0,X,LAP,nonstandard,L,L,L,D,undetermined,notation!=smiles_corn;
+7427,4.0,n,N,standard,D,,D,achiral,undetermined,notation!=smiles_corn;
+7427,5.0,G,G,standard,L,,achiral,L,undetermined,notation!=smiles_corn;
+11145,6.0,x,ACT-D-Orn,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+22153,3.0,x,cis-4-D-Hyp,nonstandard,D,L,undetermined,D,D,notation_case!=notation_name;
+24186,5.0,x,Orn,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+11146,6.0,x,iPr-D-Orn,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+22154,3.0,x,cis-4-D-Hyp,nonstandard,D,L,undetermined,D,D,notation_case!=notation_name;
+6917,7.0,X,D-Allo-Thr,nonstandard,L,D,undetermined,D,D,notation_case!=notation_name;
+22155,3.0,x,cis-4-D-Hyp,nonstandard,D,L,undetermined,D,D,notation_case!=notation_name;
+14368,4.0,x,C10-N6-D-Lys,nonstandard,D,L,undetermined,D,D,notation_case!=notation_name;
+20925,4.0,X,D-3-NH2-13-Me-C14,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+10821,11.0,X,D-TIC,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+13169,2.0,x,C10-N6-D-Lys,nonstandard,D,L,undetermined,D,D,notation_case!=notation_name;
+12095,9.0,x,C10-N6-D-Lys,nonstandard,D,L,undetermined,D,D,notation_case!=notation_name;
+18898,1.0,x,cis-4-D-Hyp,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+20217,10.0,x,C10-N6-D-Lys,nonstandard,D,L,undetermined,D,D,notation_case!=notation_name;
+14375,7.0,x,C10-N6-D-Lys,nonstandard,D,L,undetermined,D,D,notation_case!=notation_name;
+20220,10.0,x,C10-N6-D-Lys,nonstandard,D,L,undetermined,D,D,notation_case!=notation_name;
+12099,1.0,x,C10-N6-D-Lys,nonstandard,D,L,undetermined,D,D,notation_case!=notation_name;
+19066,15.0,X,D-Allo-Thr,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+20223,1.0,x,C10-N6-D-Lys,nonstandard,D,L,undetermined,D,D,notation_case!=notation_name;
+23556,1.0,x,N-Bip-D-Arg,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+23556,2.0,x,N-Bip-D-Arg,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+11191,13.0,x,Orn,nonstandard,D,L,undetermined,L,L,notation_case!=notation_name;
+19067,15.0,X,D-Allo-Thr,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+23304,4.0,X,D-3-NH2-10-Me-C12,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+23557,2.0,x,N-Bip-D-Arg,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+18509,2.0,X,D-Me-Br-Tyr,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+21067,2.0,x,cis-4-D-Hyp,nonstandard,D,L,undetermined,D,D,notation_case!=notation_name;
+7412,2.0,s,S,standard,D,,D,L,undetermined,notation!=smiles_corn;
+7412,4.0,N,N,standard,L,,L,achiral,undetermined,notation!=smiles_corn;
+7412,5.0,G,G,standard,L,,achiral,L,undetermined,notation!=smiles_corn;
+7412,8.0,N,N,standard,L,,L,D,D,notation!=smiles_corn;
+13436,2.0,x,cis-4-D-Hyp,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+21286,2.0,x,O-Me-D-Tyr,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+7413,1.0,x,D-LAP,nonstandard,D,D,D,L,undetermined,notation!=smiles_corn;
+7413,4.0,N,N,standard,L,,L,achiral,undetermined,notation!=smiles_corn;
+7413,5.0,G,G,standard,L,,achiral,L,undetermined,notation!=smiles_corn;
+7413,8.0,N,N,standard,L,,L,D,D,notation!=smiles_corn;
+10930,11.0,x,Thr(GalNAc),nonstandard,D,L,undetermined,L,L,notation_case!=notation_name;
+18557,1.0,x,cis-4-D-Hyp,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+20228,1.0,x,OMe-Trp,nonstandard,D,L,undetermined,L,L,notation_case!=notation_name;
+21287,2.0,x,O-Me-D-Tyr,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+7414,1.0,X,LAP,nonstandard,L,L,L,D,undetermined,notation!=smiles_corn;
+7414,2.0,s,S,standard,D,,D,L,undetermined,notation!=smiles_corn;
+7414,4.0,N,N,standard,L,,L,achiral,undetermined,notation!=smiles_corn;
+7414,5.0,G,G,standard,L,,achiral,L,undetermined,notation!=smiles_corn;
+18974,2.0,x,Cbz-D-Orn,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+20229,1.0,x,β-BzThi-Ala,nonstandard,D,L,undetermined,L,L,notation_case!=notation_name;
+7415,4.0,N,N,standard,L,,L,achiral,undetermined,notation!=smiles_corn;
+7415,5.0,G,G,standard,L,,achiral,L,undetermined,notation!=smiles_corn;
+18445,3.0,X,D-Orn,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+20230,1.0,x,6-F-Trp,nonstandard,D,L,undetermined,L,L,notation_case!=notation_name;
+7416,3.0,y,Y,standard,D,,D,L,undetermined,notation!=smiles_corn;
+7416,4.0,N,N,standard,L,,L,achiral,undetermined,notation!=smiles_corn;
+7416,5.0,G,G,standard,L,,achiral,L,undetermined,notation!=smiles_corn;
+7416,8.0,N,N,standard,L,,L,D,D,notation!=smiles_corn;
+18446,3.0,X,D-Orn,nonstandard,L,D,undetermined,,,notation_case!=notation_name;
+7417,1.0,x,D-LAP,nonstandard,D,D,D,L,undetermined,notation!=smiles_corn;
+7417,2.0,S,S,standard,L,,L,D,undetermined,notation!=smiles_corn;
+7417,3.0,y,Y,standard,D,,D,L,undetermined,notation!=smiles_corn;
+7417,4.0,N,N,standard,L,,L,achiral,undetermined,notation!=smiles_corn;
+7417,5.0,G,G,standard,L,,achiral,L,undetermined,notation!=smiles_corn;
+7417,8.0,N,N,standard,L,,L,D,D,notation!=smiles_corn;
+16828,7.0,X,D-Gly-C8,nonstandard,L,D,undetermined,D,D,notation_case!=notation_name;
+22015,2.0,x,2-OH-Phe,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+7418,1.0,X,LAP,nonstandard,L,L,L,D,undetermined,notation!=smiles_corn;
+7418,3.0,y,Y,standard,D,,D,L,undetermined,notation!=smiles_corn;
+7418,4.0,N,N,standard,L,,L,achiral,undetermined,notation!=smiles_corn;
+7418,5.0,G,G,standard,L,,achiral,L,undetermined,notation!=smiles_corn;
+16829,7.0,X,D-Gly-C8,nonstandard,L,D,undetermined,D,D,notation_case!=notation_name;
+19077,2.0,x,cis-4-D-Hyp,nonstandard,D,L,undetermined,,,notation_case!=notation_name;
+7419,2.0,S,S,standard,L,,L,D,undetermined,notation!=smiles_corn;
+7419,3.0,y,Y,standard,D,,D,L,undetermined,notation!=smiles_corn;
+7419,4.0,N,N,standard,L,,L,achiral,undetermined,notation!=smiles_corn;
+7419,5.0,G,G,standard,L,,achiral,L,undetermined,notation!=smiles_corn;
+22826,1.0,x,D-MET(O),nonstandard,D,D,D,L,L,notation!=smiles_corn;
+6076,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+6077,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+6578,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+6579,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+6580,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+6582,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+6780,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+6781,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+11142,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+11143,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+11144,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+11145,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+11146,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+11226,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+11242,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+11243,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+11244,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+13002,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+13436,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+14528,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+15677,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+16115,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+18434,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+18538,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+18557,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+18594,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+18595,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+18857,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+18859,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+18860,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+18862,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+18864,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+18866,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+18868,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+18872,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+18898,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+18974,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+18976,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+19077,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+19080,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+19242,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+19562,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+19563,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+19564,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+19565,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+20922,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+20923,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+21125,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+21126,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+21128,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+21159,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+21167,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+21168,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+21286,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+21287,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+21288,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+21630,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+21631,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+21632,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+21772,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+22015,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+22085,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+22151,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+22157,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+22158,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+22198,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+22805,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+22806,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+23270,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+23271,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+23556,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+23557,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+23741,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+23743,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+24097,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+24099,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+24101,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+24102,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+24204,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+24205,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+25283,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+25284,,,,,,,,,,peptide-level counts differ (positions could not be mapped)
+25706,,,,,,,,,,peptide-level counts differ (positions could not be mapped)

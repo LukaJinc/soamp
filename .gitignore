@@ -229,6 +229,10 @@ wandb/
 # config/features/peptide_peptideclm.yaml`. The RDKit descriptor artifact
 # (1.4MB) IS committed; this one is built per-environment and cached to Drive.
 data/peptide_features_peptideclm.csv
+# Same file for the dev datasets (data/dev_v2: 8,478 x 768 floats, 130MB). It travels in the W&B data
+# artifact (scripts/exp/publish_data.py), never in git.
+data/dev/peptide_features_peptideclm.csv
+data/dev_v2/peptide_features_peptideclm.csv
 
 # EDA intermediates: 39MB of clustering embeddings/distance matrices, all
 # regenerable from scripts/EDA/01-05 and not an input to any pipeline stage.

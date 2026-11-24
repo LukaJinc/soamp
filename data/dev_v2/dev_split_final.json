@@ -1,0 +1,92 @@
+{
+ "method": "stratified_cluster_split over labelled pairs of precomputed clusters",
+ "parameters": {
+  "test_size": 0.2,
+  "n_folds": 5,
+  "lambda_noncanonical": 30.0,
+  "lambda_active": 30.0,
+  "n_iterations": 100000,
+  "seed": 42
+ },
+ "labelled_peptides": 8478,
+ "labelled_pairs": 16189,
+ "clusters_used": 3266,
+ "cluster_kinds": {
+  "alignment": 2623,
+  "murcko": 643
+ },
+ "buckets": [
+  {
+   "bucket": "test",
+   "peptides": 1681,
+   "clusters": 546,
+   "pairs": 3239,
+   "nonlinear_pairs": 694,
+   "active_pairs": 2023,
+   "pair_share_%": 20.01,
+   "target_%": 20.0,
+   "nonlinear_%": 21.43,
+   "active_%": 62.46
+  },
+  {
+   "bucket": "fold_0",
+   "peptides": 1414,
+   "clusters": 544,
+   "pairs": 2589,
+   "nonlinear_pairs": 554,
+   "active_pairs": 1617,
+   "pair_share_%": 15.99,
+   "target_%": 16.0,
+   "nonlinear_%": 21.4,
+   "active_%": 62.46
+  },
+  {
+   "bucket": "fold_1",
+   "peptides": 1356,
+   "clusters": 544,
+   "pairs": 2592,
+   "nonlinear_pairs": 555,
+   "active_pairs": 1619,
+   "pair_share_%": 16.01,
+   "target_%": 16.0,
+   "nonlinear_%": 21.41,
+   "active_%": 62.46
+  },
+  {
+   "bucket": "fold_2",
+   "peptides": 1374,
+   "clusters": 544,
+   "pairs": 2589,
+   "nonlinear_pairs": 554,
+   "active_pairs": 1617,
+   "pair_share_%": 15.99,
+   "target_%": 16.0,
+   "nonlinear_%": 21.4,
+   "active_%": 62.46
+  },
+  {
+   "bucket": "fold_3",
+   "peptides": 1352,
+   "clusters": 544,
+   "pairs": 2590,
+   "nonlinear_pairs": 555,
+   "active_pairs": 1618,
+   "pair_share_%": 16.0,
+   "target_%": 16.0,
+   "nonlinear_%": 21.43,
+   "active_%": 62.47
+  },
+  {
+   "bucket": "fold_4",
+   "peptides": 1301,
+   "clusters": 544,
+   "pairs": 2590,
+   "nonlinear_pairs": 555,
+   "active_pairs": 1618,
+   "pair_share_%": 16.0,
+   "target_%": 16.0,
+   "nonlinear_%": 21.43,
+   "active_%": 62.47
+  }
+ ]
+}

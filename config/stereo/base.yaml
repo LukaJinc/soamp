@@ -1,0 +1,19 @@
+# Read-only L/D stereochemistry audit of the dev corpus (see pipeline/stereo/).
+inputs:
+  raw_jsonl: .cache/dbaasp_dev_raw.jsonl
+  processed_parquet: data/dev/dbaasp_dev_processed.parquet
+  split_parquet: data/dev/dbaasp_dev_split.parquet
+outputs:
+  dir: reports/stereo_audit
+  residues: residues.parquet
+  peptides: peptides.csv
+  disagreements: disagreements.csv
+  twins: twins.csv
+  twin_mic: twin_mic_differences.csv
+  summary: summary.md
+n_jobs: 4
+alignment:            # sensitivity check in stage 04; same values as config/splitting/base.yaml
+  identity_thresholds: [0.6, 0.9]
+  gap_open: 5
+  gap_extend: 1
+  n_jobs: 4

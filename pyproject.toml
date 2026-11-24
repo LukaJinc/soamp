@@ -21,6 +21,7 @@ dependencies = [
     "pydantic==2.13.4",
     "torch==2.13.0",
     "scikit-learn==1.9.0",
+    "xgboost==3.4.1",
     "python-dotenv==1.2.2",
     "transformers==5.16.1",
     "SmilesPE==0.0.3",

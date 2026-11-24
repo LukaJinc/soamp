@@ -171,7 +171,7 @@ def main() -> None:
     # Every fold builds the same architecture, so one throwaway instance from
     # the preview bundle gives the exact trainable-parameter count to log.
     is_tree = CFG.model.architecture in TREE_ARCHITECTURES
-    run.summary["n_parameters"] = count_tree_parameters(CFG.model.active_kwargs()) if is_tree else count_parameters(build_model(
+    run.summary["n_parameters"] = count_tree_parameters(CFG.model.active_kwargs(), CFG.model.architecture) if is_tree else count_parameters(build_model(
         preview_bundle, architecture=CFG.model.architecture,
         graph_encoder_kwargs=CFG.model.graph_encoder.model_dump(), **CFG.model.active_kwargs(),
     ))
@@ -238,6 +238,7 @@ def main() -> None:
                 peptide_method_kwargs=peptide_method_kwargs,
                 organism_method=organism_method,
                 params=CFG.model.active_kwargs(),
+                architecture=CFG.model.architecture,
                 class_balancing_mode=CFG.class_balancing.mode,
                 class_balancing_fixed_pos_weight=CFG.class_balancing.fixed_pos_weight,
                 on_epoch_end=log_epoch,

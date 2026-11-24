@@ -1,0 +1,43 @@
+=== Dev classification dataset ===
+threshold_unit: µg/ml (recomputed from concentration)
+records: 26535
+na_records: 1113
+record_labels: {'active': 12131, 'uncertain': 7734, 'inactive': 6670}
+censor_directions: {'exact': 21233, 'gt': 5223, 'lt': 79}
+gt_records_below_active_threshold_not_labelled_active: 98
+peptide_organism_pairs: 22840
+labelled_pairs: 16189
+labels: {'active': 10112, 'inactive': 6077}
+na_only_labelled_pairs: 1038
+pairs_dropped_for_conflicting_labels: 285
+of_which_involving_an_na_row: 34
+peptides: 8478
+by_organism: {'Acinetobacter baumannii ATCC 19606': {'active': 945, 'inactive': 434}, 'Bacillus subtilis ATCC 6633': {'active': 538, 'inactive': 194}, 'Enterococcus faecalis ATCC 29212': {'active': 676, 'inactive': 560}, 'Escherichia coli ATCC 25922': {'active': 3433, 'inactive': 1910}, 'Klebsiella pneumoniae ATCC 700603': {'active': 418, 'inactive': 417}, 'Pseudomonas aeruginosa ATCC 27853': {'active': 1937, 'inactive': 1252}, 'Staphylococcus aureus ATCC 25923': {'active': 2165, 'inactive': 1310}}
+by_split: {'train': 12950, 'test': 3239}
+Wrote /Users/lukajin/PycharmProjects/soamp/data/dev_v2/mic_classification_dataset.csv
+Wrote /Users/lukajin/PycharmProjects/soamp/data/dev_v2/peptide_split.csv
+
+Bucket summary (labelled pairs):
+        peptides  clusters  pairs  nonlinear_pairs  active_pairs  pair_share_%  target_%  nonlinear_%  active_%
+bucket                                                                                                         
+test        1681       546   3239              694          2023         20.01      20.0        21.43     62.46
+fold_0      1414       544   2589              554          1617         15.99      16.0        21.40     62.46
+fold_1      1356       544   2592              555          1619         16.01      16.0        21.41     62.46
+fold_2      1374       544   2589              554          1617         15.99      16.0        21.40     62.46
+fold_3      1352       544   2590              555          1618         16.00      16.0        21.43     62.47
+fold_4      1301       544   2590              555          1618         16.00      16.0        21.43     62.47
+
+Active % per organism and bucket:
+bucket                              fold_0  fold_1  fold_2  fold_3  fold_4  test
+organism                                                                        
+Acinetobacter baumannii ATCC 19606    58.4    69.3    72.1    70.8    70.5  67.3
+Bacillus subtilis ATCC 6633           86.3    73.9    62.9    68.8    74.0  70.2
+Enterococcus faecalis ATCC 29212      54.9    52.0    44.9    56.6    59.1  59.4
+Escherichia coli ATCC 25922           66.0    62.5    62.7    65.9    62.9  65.1
+Klebsiella pneumoniae ATCC 700603     47.6    63.9    65.2    55.3    37.6  38.0
+Pseudomonas aeruginosa ATCC 27853     60.1    60.5    67.2    57.3    56.9  61.6
+Staphylococcus aureus ATCC 25923      60.4    62.4    59.1    61.2    66.8  63.7
+Wrote /Users/lukajin/PycharmProjects/soamp/data/dev_v2/dbaasp_dev_split_final.parquet
+Wrote /Users/lukajin/PycharmProjects/soamp/data/dev_v2/dev_split_final.json
+Wrote /Users/lukajin/PycharmProjects/soamp/reports/dev_v2/na_only_pairs.csv (1038 pairs)
+Wrote /Users/lukajin/PycharmProjects/soamp/reports/dev_v2/label_conflicts.csv (285 pairs)

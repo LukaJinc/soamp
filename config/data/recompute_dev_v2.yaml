@@ -1,0 +1,18 @@
+# MIC recomputation for the seven dev target strains (see src/soamp/data/mic_recompute.py).
+# Consumed by pipeline/data/04_recompute_mic.py; the output feeds config/data/dev_v2.yaml.
+paths:
+  processed_parquet: data/dev/dbaasp_dev_processed.parquet   # never modified
+  out_dir: data/dev_v2
+  reports_dir: reports/dev_v2
+
+organisms:
+  - Escherichia coli ATCC 25922
+  - Staphylococcus aureus ATCC 25923
+  - Pseudomonas aeruginosa ATCC 27853
+  - Acinetobacter baumannii ATCC 19606
+  - Klebsiella pneumoniae ATCC 700603
+  - Enterococcus faecalis ATCC 29212
+  - Bacillus subtilis ATCC 6633
+
+expected_dropped_rows: 3   # 1 empty concentration + 2 numbers without a unit
+bogus_mw_below: 100.0

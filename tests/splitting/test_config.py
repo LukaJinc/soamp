@@ -60,3 +60,36 @@ def test_base_override_composition(tmp_path):
     cfg = load_config(override, SplittingConfig)
     assert cfg.fingerprint_graph.fingerprint_threshold == 0.9
     assert cfg.paths.data_dir.name == "data"
+
+
+# ---- dev-split config -----------------------------------------------------
+
+def test_dev_configs_load_and_differ_only_where_intended():
+    from soamp.splitting.dev_config import DevSplitConfig
+    from soamp.utils.config import load_config
+
+    v1 = load_config("config/splitting/dev.yaml", DevSplitConfig)
+    v2 = load_config("config/splitting/dev_v2.yaml", DevSplitConfig)
+    assert (v1.identity_threshold, v1.d_residues) == (0.6, "separate")
+    assert (v2.identity_threshold, v2.d_residues) == (0.8, "map_to_L")
+    assert v1.hard_link_identity == v2.hard_link_identity == 0.9
+    assert v1.organisms == v2.organisms and len(v1.organisms) == 7
+    assert v1.split_output != v2.split_output           # v2 never overwrites v1
+    assert "dbaasp_dev_split.parquet" not in {v1.split_output.name, v2.split_output.name}   # the first (3-strain) split is never a target
+    assert "D-TIC" in v2.name_exceptions
+
+
+def test_dev_config_rejects_unknown_key_and_bad_values():
+    import pytest
+    from pydantic import ValidationError
+
+    from soamp.splitting.dev_config import DevSplitConfig
+
+    base = dict(organisms=["x"], identity_threshold=0.8, split_output="a.parquet")
+    DevSplitConfig(**base)
+    with pytest.raises(ValidationError):
+        DevSplitConfig(**base, d_residue="map_to_L")        # typo'd key
+    with pytest.raises(ValidationError):
+        DevSplitConfig(**{**base, "d_residues": "mirror"})
+    with pytest.raises(ValidationError):
+        DevSplitConfig(**{**base, "identity_threshold": 80})

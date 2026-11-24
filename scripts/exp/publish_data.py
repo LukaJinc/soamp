@@ -16,8 +16,10 @@ import sys
 import wandb
 from dotenv import load_dotenv
 
+from soamp.runs.data_artifact import build_metadata, describe
 from soamp.runs.launch_plan import data_files
 from soamp.runs.ledger import OPS_PROJECT
+from soamp.runs.request import DEFAULT_DATASET
 from soamp.utils.config import REPO_ROOT
 
 log = logging.getLogger("publish_data")
@@ -25,7 +27,7 @@ log = logging.getLogger("publish_data")
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dataset", default="dev")
+    ap.add_argument("--dataset", default=DEFAULT_DATASET)
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -39,11 +41,16 @@ def main() -> int:
     if required_missing:
         log.error("required input(s) missing locally: %s", required_missing)
         return 2
+    # Provenance travels with the artifact: per-file size + sha256, counts, git commit (soamp.runs.data_artifact).
+    meta = build_metadata(args.dataset, REPO_ROOT, present, wanted[0])
+    log.info("total %.1f MB in %d files | %s", sum(v["bytes"] for v in meta["files"].values()) / 1e6, len(present), describe(meta))
+    if meta["git"]["dirty"]:
+        log.warning("tracked files have uncommitted changes: the recorded git sha does not fully describe this data")
     if args.dry_run:
         return 0
 
     run = wandb.init(entity=os.environ.get("WANDB_ENTITY"), project=OPS_PROJECT, job_type="publish_data", name=f"publish-{args.dataset}")
-    art = wandb.Artifact(f"soamp_{args.dataset}_data", type="dataset")
+    art = wandb.Artifact(f"soamp_{args.dataset}_data", type="dataset", description=describe(meta), metadata=meta)
     for f in present:
         art.add_file(str(REPO_ROOT / f), name=f)
     run.log_artifact(art, aliases=["latest"]).wait()

@@ -1,0 +1,16 @@
+# Smoke test for the dev_v2 dataset (7 strains, recomputed MIC) and the XGBoost architecture:
+# one MLP, one scikit-learn boosting and one XGBoost cell on RDKit x vocab, 5-fold CV, tiny settings.
+# `dataset` is omitted on purpose: the default is dev_v2.
+experiment: dev_v2_smoke_v1
+seeds: [42]
+representations:
+  peptide: [rdkit]
+  organism: [vocab]
+architectures:
+  - name: baseline_classifier
+    epochs: 5
+    hparams: {weight_decay: 1.0e-3}
+  - name: hist_gradient_boosting_classifier
+    hparams: {max_iter: 60, learning_rate: 0.1, max_leaf_nodes: 15}
+  - name: xgboost_classifier
+    hparams: {n_estimators: 60, learning_rate: 0.1, max_depth: 4}

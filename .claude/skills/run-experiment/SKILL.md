@@ -13,13 +13,15 @@ work around a refusal. You only translate the request into a request file and ca
 1. In the cloned repo run `pip install -q -e . --no-deps` (idempotent, ~2 s; the cloud setup script does not always run it in the repo).
 2. Write `config/requests/<experiment>.yaml` from what the user asked. Rules:
    - `experiment`: a NEW lowercase slug (a-z, 0-9, `_`, `-`; 3-49 chars), e.g. `repr_sweep_v2`. It becomes the W&B group; never reuse a name unless the user wants a re-run (re-runs skip finished cells).
-   - `dataset: dev`. Peptide representations: `rdkit`, `peptideclm`, `molgraph`. Organism: only `vocab` exists for dev (others are rejected with a message).
+   - `dataset`: leave it out - the default is `dev_v2`, the current dataset (seven strains, MICs recomputed from concentration, NA rows inactive, 16,189 labelled pairs, test + 5 folds; `docs/dev_dataset_v2.md`). `dataset: dev` is the OLDER three-strain data, only if the user asks for it. For both: peptide representations `rdkit`, `peptideclm`, `molgraph`; organism: only `vocab` exists (others are rejected with a message).
+   - A `dev_v2` request has no comparison baseline: the default baseline run (`dev_sweep_small_wd1e-3`) belongs to `dev` and is not comparable, so do not set `baseline_run` unless the user names a dev_v2 run.
    - Cross-validation is the default and the only supported mode: do not write `cv:` unless asked; never `cv: false`.
    - `seeds: [42]` unless asked; `gpu_name` defaults to `A100_SXM4` (the class that has worked): only change it if the user asks for another GPU.
    - Architectures and their OWN hyperparameters (a key from another architecture is an error):
      - `baseline_classifier`: `learning_rate`, `weight_decay`, `batch_size`, `organism_embed_dim`, `hidden_dims`; plus `epochs`.
      - `attention_fusion_classifier`: `learning_rate`, `weight_decay`, `batch_size`, `projection_dim`, `num_attention_heads`, `num_attention_layers`, `hidden_dims`; plus `epochs`.
      - `hist_gradient_boosting_classifier` (tree model): `max_iter`, `learning_rate`, `max_leaf_nodes`, `min_samples_leaf`, `l2_regularization`, `max_features` - no `epochs`, not usable with `molgraph`.
+     - `xgboost_classifier` (tree model, XGBoost on CPU): `n_estimators` (boosting rounds), `learning_rate`, `max_depth`, `min_child_weight`, `reg_lambda`, `reg_alpha`, `gamma`, `subsample`, `colsample_bytree` - no `epochs` (rounds are set by `n_estimators`), not usable with `molgraph`. Its keys are NOT the scikit-learn ones (`max_iter`, `max_leaf_nodes`, ...); mixing them is an error.
    - A list of values is a grid axis inside ONE architecture. `hidden_dims`: a flat list is one value, a list of lists is an axis.
    - Put architecture settings under that architecture's `hparams:`; `epochs` goes next to `name:`.
    - Example: see `config/requests/example_repr_v1.yaml`.

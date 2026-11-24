@@ -1,0 +1,9 @@
+peptide_id,dbaaspId,name,rows,implied_mw,rdkit_mw
+1710,DBAASPS_1710,(Nspe-NLys)2-NLys2 -(Nspe-NLys)2-NLys-Nspe2-NLys-Nspe,1,17.03,2170.86
+6745,DBAASPS_6745,(Nspe-NLys-Nspe-NLys-NLys-Nspe)2,1,17.03,1753.3
+20978,DBAASPS_20978,Meropenem,7,45.09,383.47
+22876,DBAASPS_22876,Globomycin 51,1,0,750.04
+24091,DBAASPS_24091,NLys-Nspe-Nspe-(NLys-Npm-Npm)2-NLys-Npm-Nspe,4,17.03,1749.23
+24340,DBAASPS_24340,Orn-tBu-βAc6c,2,1.01,430.64
+24343,DBAASPS_24343,Orn-tBu-βAc6c,2,0,612.94
+24346,DBAASPS_24346,Orn-tBu-βAc6c,2,0,641.99

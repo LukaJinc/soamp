@@ -62,7 +62,44 @@ DATASETS: dict[str, dict] = {
             },
         },
     },
+    # Seven target strains, MIC recomputed from concentration (ug/ml), NA rows inactive, test + 5 folds
+    # from the v2 clusters (docs/dev_dataset_v2.md). All feature files are built locally and shipped in
+    # the W&B data artifact (scripts/exp/publish_data.py --dataset dev_v2); `prepare` is only the fallback.
+    "dev_v2": {
+        "base_config": "cv_dev_v2_base.yaml",
+        "peptide": {
+            "rdkit": ("peptide_features_rdkit.csv", "peptide_feature_scaler_rdkit.json", "rdkit_descriptors"),
+            "peptideclm": ("peptide_features_peptideclm.csv", "peptide_feature_scaler_peptideclm.json", "peptideclm_embedding"),
+            "molgraph": ("peptide_features_molgraph.csv", "peptide_feature_scaler_molgraph.json", "molecular_graph"),
+        },
+        "organism": {
+            "vocab": ("organism_vocab_vocab_embedding.json", "vocab_embedding"),
+        },
+        "required_artifacts": ["data/dev_v2/mic_classification_dataset.csv", "data/dev_v2/peptide_split.csv"],
+        "prepare": {
+            "peptide": {
+                "rdkit": [
+                    (["python", "pipeline/features/01_build_peptide_features.py", "--config", "config/features/dev_v2_peptide_rdkit.yaml"], ["data/dev_v2/peptide_features_rdkit.csv"]),
+                    (["python", "pipeline/features/03_fit_peptide_scaler.py", "--config", "config/features/dev_v2_peptide_rdkit.yaml"], ["data/dev_v2/peptide_feature_scaler_rdkit.json"]),
+                ],
+                "peptideclm": [
+                    (["python", "pipeline/features/01_build_peptide_features.py", "--config", "config/features/dev_v2_peptide_peptideclm.yaml"], ["data/dev_v2/peptide_features_peptideclm.csv"]),
+                    (["python", "pipeline/features/03_fit_peptide_scaler.py", "--config", "config/features/dev_v2_peptide_peptideclm.yaml"], ["data/dev_v2/peptide_feature_scaler_peptideclm.json"]),
+                ],
+                "molgraph": [
+                    (["python", "pipeline/features/03_fit_peptide_scaler.py", "--config", "config/features/dev_v2_peptide_molgraph.yaml"], ["data/dev_v2/peptide_feature_scaler_molgraph.json"]),
+                ],
+            },
+            "organism": {
+                "vocab": [
+                    (["python", "pipeline/features/02_build_organism_vocab.py", "--config", "config/features/dev_v2_organism_vocab.yaml"], ["data/dev_v2/organism_vocab_vocab_embedding.json"]),
+                ],
+            },
+        },
+    },
 }
+
+DEFAULT_DATASET = "dev_v2"   # a request that names no dataset means the seven-strain data
 
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]{2,48}$")
 
@@ -132,18 +169,34 @@ class HistGradientBoostingHParams(_HParams):
     max_features: float | list[float] | None = None
 
 
+class XGBoostHParams(_HParams):
+    """XGBoost tree model: own learning_rate, `n_estimators` boosting rounds instead of epochs."""
+
+    n_estimators: int | list[int] | None = None
+    learning_rate: float | list[float] | None = None
+    max_depth: int | list[int] | None = None
+    min_child_weight: float | list[float] | None = None
+    reg_lambda: float | list[float] | None = None
+    reg_alpha: float | list[float] | None = None
+    gamma: float | list[float] | None = None
+    subsample: float | list[float] | None = None
+    colsample_bytree: float | list[float] | None = None
+
+
 @dataclass(frozen=True)
 class ArchSpec:
     tag: str  # short name used in run names
     hparams_cls: type[_HParams]
     uses_common: bool = True  # shares optim.learning_rate/weight_decay + loop.batch_size/epochs
     vector_only: bool = False  # cannot consume the molecular_graph peptide input
+    rounds_param: str | None = None  # trees: the hyperparameter that sets the number of boosting rounds (no epochs)
 
 
 ARCHITECTURES: dict[str, ArchSpec] = {
     "baseline_classifier": ArchSpec("mlp", BaselineHParams),
     "attention_fusion_classifier": ArchSpec("attn", AttentionFusionHParams),
-    "hist_gradient_boosting_classifier": ArchSpec("hgb", HistGradientBoostingHParams, uses_common=False, vector_only=True),
+    "hist_gradient_boosting_classifier": ArchSpec("hgb", HistGradientBoostingHParams, uses_common=False, vector_only=True, rounds_param="max_iter"),
+    "xgboost_classifier": ArchSpec("xgb", XGBoostHParams, uses_common=False, vector_only=True, rounds_param="n_estimators"),
 }
 COMMON_FIELDS = tuple(CommonHParams.model_fields)
 
@@ -176,7 +229,7 @@ class ArchitectureRequest(BaseModel):
     def _validate_hparams(self) -> "ArchitectureRequest":
         spec = ARCHITECTURES[self.name]
         if not spec.uses_common and self.epochs is not None:
-            raise ValueError(f"architecture {self.name!r} has no epochs; set hparams.max_iter (boosting rounds) instead")
+            raise ValueError(f"architecture {self.name!r} has no epochs; set hparams.{spec.rounds_param} (boosting rounds) instead")
         common, specific = self._split()
         # extra="forbid" on both models turns a foreign/typo'd key into an error that
         # names the architecture, instead of silently dropping it.
@@ -218,7 +271,7 @@ class ExperimentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     experiment: str  # W&B group; lowercase slug
-    dataset: str = "dev"
+    dataset: str = DEFAULT_DATASET   # "dev_v2" (7 strains, recomputed MIC); "dev" = the older 3-strain data
     cv: bool = True  # default for (almost) every run; False is rejected until a single-split path exists
     seeds: list[int] = [42]
     representations: Representations
