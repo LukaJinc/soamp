@@ -1,0 +1,16 @@
+# dev_v2 baseline grid, neural half: every peptide representation x vocab organism,
+# both neural architectures at the settings of the earlier dev sweep (40 epochs, wd 1e-3).
+# 5-fold CV (default), one seed, dataset omitted on purpose (default is dev_v2).
+# Tree models cannot read molgraph, so they live in dev_v2_baseline_grid_trees_v1.yaml.
+experiment: dev_v2_baseline_grid_v1
+seeds: [42]
+representations:
+  peptide: [rdkit, peptideclm, molgraph]
+  organism: [vocab]
+architectures:
+  - name: baseline_classifier
+    epochs: 40
+    hparams: {weight_decay: 1.0e-3}
+  - name: attention_fusion_classifier
+    epochs: 40
+    hparams: {projection_dim: 32, hidden_dims: [32, 16], weight_decay: 1.0e-3}

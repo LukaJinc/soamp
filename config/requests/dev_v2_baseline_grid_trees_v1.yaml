@@ -1,0 +1,13 @@
+# dev_v2 baseline grid, tree half: the vector peptide representations x vocab organism
+# (tree models cannot read molgraph), standard boosting settings, 5-fold CV, one seed.
+# Neural half: dev_v2_baseline_grid_v1.yaml.
+experiment: dev_v2_baseline_grid_trees_v1
+seeds: [42]
+representations:
+  peptide: [rdkit, peptideclm]
+  organism: [vocab]
+architectures:
+  - name: hist_gradient_boosting_classifier
+    hparams: {max_iter: 300, learning_rate: 0.05, max_leaf_nodes: 31}
+  - name: xgboost_classifier
+    hparams: {n_estimators: 300, learning_rate: 0.05, max_depth: 6}
