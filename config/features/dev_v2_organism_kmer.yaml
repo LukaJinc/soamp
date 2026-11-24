@@ -1,0 +1,8 @@
+# kmer organism features for the dev v2 dataset (data/dev_v2/: seven strains, MIC recomputed from concentration). Same method as organism_kmer.yaml; only the data
+# dir moves. Built on the laptop and checked in (soamp.runs.request.PREBUILT_ORGANISM): the
+# launcher refuses kmer cells until this file exists and covers every strain of the dataset.
+_base_: organism_kmer.yaml
+
+paths:
+  data_dir: data/dev_v2
+  reports_dir: reports/dev_v2

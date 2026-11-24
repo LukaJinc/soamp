@@ -22,8 +22,47 @@ from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+# Organism representations every dataset offers: request name -> (artifact file in the
+# dataset's data dir, featurizer method). The file is self-describing ("method" key), so
+# training needs nothing else to switch representation.
+ORGANISM_REPRESENTATIONS: dict[str, tuple[str, str]] = {
+    "vocab": ("organism_vocab_vocab_embedding.json", "vocab_embedding"),
+    # genome k-mer composition (340-d) of a pinned RefSeq assembly per species
+    "kmer": ("organism_vocab_kmer_composition.json", "kmer_composition"),
+    # frozen DNABERT-S embedding (768-d) of each species' 16S rRNA gene
+    "dnabert": ("organism_vocab_dnabert_s_16s.json", "dnabert_s_16s"),
+}
+
+# Representations whose artifact is NEVER built on the instance: building it needs NCBI
+# genomes (k-mer) or a Colab GPU run (DNABERT-S), so it is built on the laptop, checked in
+# under data/<dataset>/ and shipped in the W&B data artifact. `--plan` refuses a request
+# whose prebuilt file is missing or does not cover every organism of the dataset
+# (soamp.runs.coverage); the instance treats the file as a required input.
+PREBUILT_ORGANISM = ("kmer", "dnabert")
+
+# How to (re)build a prebuilt organism artifact, shown when one is missing or incomplete.
+ORGANISM_BUILD_HINT: dict[str, str] = {
+    "kmer": (
+        "add the species to config/organism_genomes/organism_genome_accessions.csv, then run "
+        "pipeline/features/00_fetch_organism_genomes.py and "
+        "pipeline/features/02_build_organism_vocab.py --config config/features/{dataset}_organism_kmer.yaml"
+    ),
+    "dnabert": (
+        "add the species to config/organism_genomes/organism_genome_accessions.csv, re-run "
+        "scripts/colab/04_embed_organisms.ipynb to refresh data/organism_16s_dnabert_s.json, then run "
+        "pipeline/features/02_build_organism_vocab.py --config config/features/{dataset}_organism_dnabert.yaml"
+    ),
+}
+
+
+def _prebuilt(dataset: str) -> dict[str, dict[str, list[str]]]:
+    return {"organism": {o: [f"data/{dataset}/{ORGANISM_REPRESENTATIONS[o][0]}"] for o in PREBUILT_ORGANISM}}
+
+
 # Dataset -> which representation methods have artifacts/configs for it. Adding a
 # dataset or a method here is the only place that needs to change (plan.py reads it).
+# `prepare` lists the steps an instance may run to build a missing artifact; `prebuilt`
+# lists files that must already be in the data artifact (see PREBUILT_ORGANISM).
 DATASETS: dict[str, dict] = {
     "dev": {
         # config the generated cells inherit (data dir, thresholds, unit) via `_base_`
@@ -33,12 +72,10 @@ DATASETS: dict[str, dict] = {
             "peptideclm": ("peptide_features_peptideclm.csv", "peptide_feature_scaler_peptideclm.json", "peptideclm_embedding"),
             "molgraph": ("peptide_features_molgraph.csv", "peptide_feature_scaler_molgraph.json", "molecular_graph"),
         },
-        # only the vocab organism artifact exists for the dev dataset so far
-        "organism": {
-            "vocab": ("organism_vocab_vocab_embedding.json", "vocab_embedding"),
-        },
+        "organism": ORGANISM_REPRESENTATIONS,
         # Inputs every cell needs (shipped in the W&B data artifact, never built on the instance).
         "required_artifacts": ["data/dev/mic_classification_dataset.csv", "data/dev/peptide_split.csv"],
+        "prebuilt": _prebuilt("dev"),
         # Steps that build a representation's artifacts if they are not already in the data
         # artifact (skipped when every `produces` file exists). Mirrors config/vast/dev_sweep_v1.yaml.
         "prepare": {
@@ -72,10 +109,9 @@ DATASETS: dict[str, dict] = {
             "peptideclm": ("peptide_features_peptideclm.csv", "peptide_feature_scaler_peptideclm.json", "peptideclm_embedding"),
             "molgraph": ("peptide_features_molgraph.csv", "peptide_feature_scaler_molgraph.json", "molecular_graph"),
         },
-        "organism": {
-            "vocab": ("organism_vocab_vocab_embedding.json", "vocab_embedding"),
-        },
+        "organism": ORGANISM_REPRESENTATIONS,
         "required_artifacts": ["data/dev_v2/mic_classification_dataset.csv", "data/dev_v2/peptide_split.csv"],
+        "prebuilt": _prebuilt("dev_v2"),
         "prepare": {
             "peptide": {
                 "rdkit": [

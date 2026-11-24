@@ -13,7 +13,7 @@ work around a refusal. You only translate the request into a request file and ca
 1. In the cloned repo run `pip install -q -e . --no-deps` (idempotent, ~2 s; the cloud setup script does not always run it in the repo).
 2. Write `config/requests/<experiment>.yaml` from what the user asked. Rules:
    - `experiment`: a NEW lowercase slug (a-z, 0-9, `_`, `-`; 3-49 chars), e.g. `repr_sweep_v2`. It becomes the W&B group; never reuse a name unless the user wants a re-run (re-runs skip finished cells).
-   - `dataset`: leave it out - the default is `dev_v2`, the current dataset (seven strains, MICs recomputed from concentration, NA rows inactive, 16,189 labelled pairs, test + 5 folds; `docs/dev_dataset_v2.md`). `dataset: dev` is the OLDER three-strain data, only if the user asks for it. For both: peptide representations `rdkit`, `peptideclm`, `molgraph`; organism: only `vocab` exists (others are rejected with a message).
+   - `dataset`: leave it out - the default is `dev_v2`, the current dataset (seven strains, MICs recomputed from concentration, NA rows inactive, 16,189 labelled pairs, test + 5 folds; `docs/dev_dataset_v2.md`). `dataset: dev` is the OLDER three-strain data, only if the user asks for it. For both: peptide representations `rdkit`, `peptideclm`, `molgraph`; organism: `vocab`, `kmer` (genome k-mer composition) and `dnabert` (DNABERT-S 16S embedding). `kmer`/`dnabert` artifacts are prebuilt on the laptop, and `--plan` refuses them (exit 2, naming the strains and the build steps) when the dataset's artifact is missing or leaves a strain without a vector: as of 2026-11-24 they work on `dev`, while `dev_v2` still needs its 4 extra species added to the genome accessions and the 16S table.
    - A `dev_v2` request has no comparison baseline: the default baseline run (`dev_sweep_small_wd1e-3`) belongs to `dev` and is not comparable, so do not set `baseline_run` unless the user names a dev_v2 run.
    - Cross-validation is the default and the only supported mode: do not write `cv:` unless asked; never `cv: false`.
    - `seeds: [42]` unless asked; `gpu_name` defaults to `A100_SXM4` (the class that has worked): only change it if the user asks for another GPU.
@@ -34,6 +34,6 @@ work around a refusal. You only translate the request into a request file and ca
    analyses it when every cell is finished and sends the deck; first results usually take ~15-30 min.
 
 ## Notes
-- `--go` re-checks the caps against live vast.ai instances and the 24 h spend ledger, and launches only cells that have no finished W&B run, so repeating a request is safe.
+- `--plan` and `--go` both check the caps against live vast.ai instances and the 24 h spend ledger (read-only; `--plan` says when a lookup was unavailable and counted as 0). `--go` launches only cells that have no finished W&B run, so repeating a request is safe.
 - To re-launch the unfinished cells of an experiment (the watcher prints `RETRY <experiment>`): `python scripts/exp/launch.py --retry <experiment>`.
 - Check what is running (read-only): `python scripts/exp/watch.py --dry-run`.

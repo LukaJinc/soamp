@@ -3,10 +3,12 @@
     python scripts/exp/launch.py config/requests/<request>.yaml            # = --plan
     python scripts/exp/launch.py config/requests/<request>.yaml --plan     # no side effects
 
-`--plan` validates the request, expands it to cells, estimates GPU-hours/cost and
-checks every cap in config/runs/limits.yaml, using placeholders for the two live
-inputs (instances running, 24h spend) until the vast.ai/W&B ledger is wired in.
-Exit code 0 = allowed, 1 = refused, 2 = invalid request.
+`--plan` validates the request (including that every organism of the dataset has a
+real vector in each requested k-mer/DNABERT-S artifact), expands it to cells,
+estimates GPU-hours/cost and checks every cap in config/runs/limits.yaml against the
+LIVE instance count (vast.ai) and 24 h spend (W&B ledger). Both lookups are read-only
+and free; without credentials (or with --offline) they count as 0 and the output says
+so. Exit code 0 = allowed, 1 = refused, 2 = invalid request.
 
 `--go` re-checks every cap against the LIVE instance count (vast.ai) and 24 h spend
 (W&B ledger), skips cells that already have a finished W&B run, then rents instances
@@ -26,7 +28,9 @@ from pydantic import ValidationError
 
 from soamp.runs.budget import estimate, load_cost_model, load_limits, violations
 from soamp.runs.bundle import build_tarball, select_files, tracked_files
-from soamp.runs.launcher import LaunchRefused, launch
+from soamp.runs.coverage import coverage_problems
+from soamp.runs.launch_plan import prebuilt_files
+from soamp.runs.launcher import LaunchRefused, launch, plan_usage
 from soamp.runs.ledger import OPS_PROJECT, Ledger, WandbLedgerBackend
 from soamp.runs.plan import expand, request_hash
 from soamp.runs.request import ExperimentRequest
@@ -81,9 +85,16 @@ def _go(req: ExperimentRequest) -> int:
 
     data_ref = f"{entity}/{OPS_PROJECT}/soamp_{req.dataset}_data:latest"
     try:
-        wandb.Api().artifact(data_ref)
+        data_art = wandb.Api().artifact(data_ref)
     except Exception as e:
         log.error("data artifact %s not found (%s). Run on the laptop: python scripts/exp/publish_data.py --dataset %s", data_ref, e, req.dataset)
+        return 2
+    # Prebuilt organism artifacts are never built on the instance: refuse before renting if the
+    # published data artifact predates them (the instance would only fail after paying for setup).
+    needed = prebuilt_files(req.dataset, req.representations.organism)
+    absent = [f for f in needed if f not in data_art.manifest.entries]
+    if absent:
+        log.error("data artifact %s lacks %s. Re-publish on the laptop: python scripts/exp/publish_data.py --dataset %s", data_ref, absent, req.dataset)
         return 2
     try:
         res = launch(
@@ -104,12 +115,26 @@ def _go(req: ExperimentRequest) -> int:
     return 0
 
 
+def _plan_usage(offline: bool) -> tuple[int, float, list[str]]:
+    if offline:
+        return 0, 0.0, ["instance count", "24h spend"]
+
+    def spend() -> float:
+        entity = os.environ.get("WANDB_ENTITY")
+        if not (entity and os.environ.get("WANDB_API_KEY")):
+            raise RuntimeError("WANDB_ENTITY / WANDB_API_KEY not set")
+        return Ledger(WandbLedgerBackend(entity)).spend_last_24h()
+
+    return plan_usage(lambda: len(VastClient().list_instances()), spend)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("request", type=Path, nargs="?")
     ap.add_argument("--retry", metavar="EXPERIMENT", help="re-launch an experiment's unfinished cells from its latest launch manifest in W&B (implies --go)")
     ap.add_argument("--plan", action="store_true", help="validate + estimate only (default)")
     ap.add_argument("--go", action="store_true", help="rent instances and start the run (checks all caps first)")
+    ap.add_argument("--offline", action="store_true", help="--plan without the live vast.ai/W&B lookups (counts them as 0)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
@@ -122,23 +147,30 @@ def main() -> int:
     except (ValidationError, LookupError) as e:
         log.error("invalid request:\n%s", e)
         return 2
+    problems = coverage_problems(req)
+    if problems:
+        log.error("invalid request:\n  - %s", "\n  - ".join(problems))
+        return 2
 
     if args.go:
         return _go(req)
     cells = expand(req)
     limits, model = load_limits(), load_cost_model()
-    est = estimate(cells, model, limits)
+    running, spend, unchecked = _plan_usage(offline=args.offline)
+    # same sharding as --go: instances already running reduce how many this request may use
+    est = estimate(cells, model, limits, instances_available=max(limits.max_concurrent_instances - running, 0))
     log.info("experiment %s (request %s): %d cells, dataset=%s, cv=%s", req.experiment, request_hash(req), len(cells), req.dataset, req.cv)
     for arch in sorted({c.arch for c in cells}):
         log.info("  %-28s %d cells", arch, sum(c.arch == arch for c in cells))
     log.info("estimate: %.2f cell-hours on %d instance(s), %.2f h each incl. overhead, $%.2f incl. %.2fx margin (assumed $%.2f/h)",
              est.cell_hours, est.n_instances, est.hours_per_instance, est.cost_usd, limits.safety_margin, model.assumed_price_per_hour_usd)
-    # TODO(phase 1b): instances_running from `vastai show instances`, spend from the W&B ledger.
-    problems = violations(est, limits, instances_running=0, spend_last_24h_usd=0.0)
+    log.info("live usage: %d soamp instance(s) running, $%.2f launched in the last 24h%s",
+             running, spend, f" ({', '.join(unchecked)} NOT checked, counted as 0)" if unchecked else "")
+    problems = violations(est, limits, instances_running=running, spend_last_24h_usd=spend)
     if problems:
         log.error("REFUSED:\n  - %s", "\n  - ".join(problems))
         return 1
-    log.info("within all caps (live instance count and 24h spend not checked in --plan)")
+    log.info("within all caps%s", f" (except unchecked: {', '.join(unchecked)})" if unchecked else "")
     return 0
 
 
