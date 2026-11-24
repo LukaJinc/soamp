@@ -33,7 +33,7 @@ def build_run_spec(req: ExperimentRequest, cells: list[Cell], instance: Instance
     ds = DATASETS[req.dataset]
     peps = sorted({c.peptide for c in cells})
     orgs = sorted({c.organism for c in cells})
-    steps = [s for p in peps for s in ds["prepare"]["peptide"][p]] + [s for o in orgs for s in ds["prepare"]["organism"][o]]
+    steps = [s for p in peps for s in ds["prepare"]["peptide"][p]] + [s for o in orgs for s in ds["prepare"]["organism"].get(o, [])]
     seen: set[tuple] = set()
     prepare = []
     for cmd, produces in steps:
@@ -42,7 +42,7 @@ def build_run_spec(req: ExperimentRequest, cells: list[Cell], instance: Instance
             prepare.append({"cmd": cmd, "produces": produces})
     return RunSpec(
         experiments=[cell_config_path(req, c) for c in cells],
-        required_artifacts=ds["required_artifacts"],
+        required_artifacts=list(ds["required_artifacts"]) + prebuilt_files(req.dataset, orgs),
         prepare=prepare,
         instance=instance,
     )
@@ -114,4 +114,14 @@ def data_files(dataset: str) -> list[str]:
         for steps in group.values():
             for _cmd, produces in steps:
                 out.extend(produces)
+    for group in ds.get("prebuilt", {}).values():
+        for files in group.values():
+            out.extend(files)
     return list(dict.fromkeys(out))
+
+
+def prebuilt_files(dataset: str, organisms: list[str] | set[str]) -> list[str]:
+    """Repo-relative prebuilt organism artifacts (never built on the instance) these
+    organism representations need; they must already be in the data artifact."""
+    pre = DATASETS[dataset].get("prebuilt", {}).get("organism", {})
+    return [f for o in sorted(organisms) for f in pre.get(o, [])]

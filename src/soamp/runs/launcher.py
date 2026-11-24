@@ -7,6 +7,7 @@ tested without a network. scripts/exp/launch.py wires the real implementations.
 """
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -24,6 +25,7 @@ from soamp.runs.spec import InstanceSpec
 from soamp.runs.vast import LABEL_PREFIX, VastClient
 
 GRACE_SECONDS = 120
+log = logging.getLogger(__name__)
 
 
 class LaunchRefused(Exception):
@@ -38,6 +40,26 @@ class LaunchResult:
     instance_ids: list[int] = field(default_factory=list)
     estimate_usd: float = 0.0
     manifest: Manifest | None = None
+
+
+def plan_usage(count_instances: Callable[[], int], spend_24h: Callable[[], float]) -> tuple[int, float, list[str]]:
+    """Live (instances running, 24 h spend) for `--plan`, plus the names of the inputs that
+    could not be read (counted as 0). Each lookup is read-only and fails on its own, so a
+    missing vast.ai key still checks spend and vice versa. `--go` reads the same two
+    numbers in `launch` but refuses on any failure instead of falling back."""
+    unchecked: list[str] = []
+    running, spend = 0, 0.0
+    try:
+        running = int(count_instances())
+    except Exception as e:  # noqa: BLE001 -- any failure means "not checked", never a crash
+        log.warning("vast.ai instance count unavailable: %s", e)
+        unchecked.append("instance count")
+    try:
+        spend = float(spend_24h())
+    except Exception as e:  # noqa: BLE001
+        log.warning("W&B 24h spend unavailable: %s", e)
+        unchecked.append("24h spend")
+    return running, spend, unchecked
 
 
 def launch(

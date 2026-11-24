@@ -13,6 +13,7 @@ import subprocess
 import sys
 import time
 
+from soamp.runs.cell_reports import cell_report_files, upload_cell_reports
 from soamp.runs.spec import (
     RunSpec,
     describe_experiment,
@@ -24,6 +25,23 @@ from soamp.runs.spec import (
 from soamp.utils.config import REPO_ROOT, load_config
 
 log = logging.getLogger("run_experiments")
+
+
+def _upload_reports(e, rc: int) -> str | None:
+    """Upload one cell's report files; never fails the run (the cell already finished)."""
+    if not os.environ.get("WANDB_API_KEY"):
+        return None
+    files = cell_report_files(REPO_ROOT / "reports", e.exp_id)
+    try:
+        ref = upload_cell_reports(
+            e.exp_id, files, repo_root=REPO_ROOT, group=e.wandb_group,
+            entity=os.environ.get("WANDB_ENTITY"), returncode=rc,
+        )
+    except Exception as err:  # noqa: BLE001 -- a W&B hiccup must not stop the next cell
+        log.warning("could not upload reports of %s: %s", e.exp_id, err)
+        return None
+    log.info("uploaded %d report file(s) of %s -> %s", len(files), e.exp_id, ref)
+    return ref
 
 
 def main() -> int:
@@ -70,14 +88,14 @@ def main() -> int:
     out.parent.mkdir(exist_ok=True)
     for e in pending:
         start = time.time()
-        # TODO(skeleton): per-cell upload of reports/*<exp_id>* to wandb so
-        # results survive instance destruction (train_cv.py already uploads cv_results).
         rc = subprocess.run(
             [sys.executable, "pipeline/train_cv.py", "--config", str(e.config_path)],
             cwd=REPO_ROOT,
         ).returncode
         status[e.exp_id] = {"returncode": rc, "seconds": round(time.time() - start)}
         log.info("%s finished rc=%d", e.exp_id, rc)
+        # reports/*<exp_id>* only live on the instance: ship them now, failed cells included.
+        status[e.exp_id]["reports_artifact"] = _upload_reports(e, rc)
         # written after every cell, so a timeout/kill still leaves the completed cells on record
         out.write_text(json.dumps(status, indent=2))
     return 1 if any(s["returncode"] for s in status.values()) else 0

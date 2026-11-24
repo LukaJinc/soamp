@@ -116,6 +116,16 @@ def test_kmer_encode_genus_fallback():
     assert vector == [0.0, 1.0, 0.0, 0.0] + [0.0] * 16
 
 
+def test_kmer_encode_strain_falls_back_to_its_species_before_the_genus():
+    featurizer = _kmer_featurizer(genus_features={"Escherichia": [9.0] * 20})
+    assert featurizer.encode("Escherichia coli ATCC 25922") == featurizer.encode("Escherichia coli")
+    # a strain string that matches exactly still wins over its species
+    exact = _kmer_featurizer(species_features={"Escherichia coli": [1.0] * 20, "Escherichia coli K-12": [2.0] * 20})
+    assert exact.encode("Escherichia coli K-12") == [2.0] * 20
+    # an unknown species of a known genus still uses the genus row
+    assert featurizer.encode("Escherichia albertii ATCC 1") == [9.0] * 20
+
+
 def test_kmer_encode_unresolvable_organism_returns_zero_vector():
     featurizer = _kmer_featurizer()
     vector = featurizer.encode("Totally Novel Organism")
@@ -215,3 +225,25 @@ def test_dnabert_s_artifact_round_trip_and_registry(tmp_path):
     assert isinstance(restored, DnabertSOrganismFeaturizer)
     assert restored.encode("Staphylococcus aureus") == [2.0] * 4
     assert restored.feature_dim == 4
+
+
+def test_method_kwargs_from_artifact_let_a_fresh_featurizer_fit_without_genomes_or_16s_table(tmp_path):
+    from soamp.features.organism_featurizers import (
+        DnabertSOrganismFeaturizer,
+        organism_method_kwargs_from_artifact,
+    )
+
+    kmer = _kmer_featurizer().to_artifact_dict()
+    fresh = build_organism_featurizer("kmer_composition", accessions_csv_path=str(tmp_path / "absent.csv"),
+                                      **organism_method_kwargs_from_artifact(kmer))
+    fresh.fit(["Escherichia coli ATCC 25922"])  # would read FASTAs without the seeded tables
+    assert fresh.encode("Escherichia coli ATCC 25922") == kmer["species_features"]["Escherichia coli"]
+
+    dnabert = {"method": "dnabert_s_16s", "feature_dim": 2, "species_features": {"Escherichia coli": [0.5, 0.5]}, "genus_features": {}}
+    fresh = build_organism_featurizer("dnabert_s_16s", embeddings_path=str(tmp_path / "absent.json"),
+                                      **organism_method_kwargs_from_artifact(dnabert))
+    assert isinstance(fresh, DnabertSOrganismFeaturizer)
+    fresh.fit(["Escherichia coli ATCC 25922"])
+    assert fresh.feature_dim == 2 and fresh.encode("Escherichia coli ATCC 25922") == [0.5, 0.5]
+
+    assert organism_method_kwargs_from_artifact({"method": "vocab_embedding", "vocab": {}, "unknown_index": 0}) == {}

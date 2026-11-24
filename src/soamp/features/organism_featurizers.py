@@ -27,13 +27,23 @@ def resolve_species_then_genus(
     species_features: dict[str, list[float]],
     genus_features: dict[str, list[float]],
 ) -> list[float] | None:
-    """Species-exact match -> genus fallback (first word) -> None, mirroring
-    soamp.common.thresholds.lookup_threshold's precedence. Shared by every
-    genome-derived organism featurizer (k-mer, DNABERT-S)."""
+    """Exact match -> binomial species (first two words) -> genus fallback
+    (first word) -> None. Shared by every genome-derived organism featurizer
+    (k-mer, DNABERT-S).
+
+    The binomial step lets strain-level dataset strings ("Escherichia coli
+    ATCC 25922", the dev datasets) use a species-level genome/16S row
+    ("Escherichia coli"); without it they skipped straight to the genus
+    lookup and, with no genus rows, encoded as all-zero vectors."""
     organism = organism.strip()
     if organism in species_features:
         return species_features[organism]
-    genus = organism.split(" ", 1)[0] if organism else ""
+    words = organism.split()
+    if len(words) > 2:
+        binomial = " ".join(words[:2])
+        if binomial in species_features:
+            return species_features[binomial]
+    genus = words[0] if words else ""
     return genus_features.get(genus)
 
 
@@ -319,3 +329,28 @@ def organism_featurizer_from_artifact(data: dict) -> OrganismFeaturizer:
             embedding_dim=data["feature_dim"],
         )
     raise OrganismFeaturizerError(f"unknown organism featurization method in artifact: {method!r}")
+
+
+def organism_method_kwargs_from_artifact(data: dict) -> dict:
+    """Constructor kwargs that make a FRESH featurizer of the artifact's method reuse the
+    artifact's precomputed tables (row/CV mode builds a new featurizer per fold).
+
+    Genome-derived vectors are fixed per species and do not depend on which rows are in
+    the fit split, so seeding them from the artifact gives exactly what a re-fit would, but
+    without the genome FASTA cache (k-mer) or the top-level 16S table (DNABERT-S), neither
+    of which exists on a vast.ai instance. ``vocab_embedding`` returns {}: its vocabulary
+    must be re-fit on each fold's own fit organisms."""
+    method = data["method"]
+    if method == "kmer_composition":
+        return {
+            "k_values": tuple(data["k_values"]),
+            "species_features": data["species_features"],
+            "genus_features": data["genus_features"],
+        }
+    if method == DnabertSOrganismFeaturizer.METHOD:
+        return {
+            "species_features": data["species_features"],
+            "genus_features": data["genus_features"],
+            "embedding_dim": data["feature_dim"],
+        }
+    return {}

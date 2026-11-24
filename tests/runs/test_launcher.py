@@ -120,3 +120,37 @@ def test_request_round_trips_through_the_manifest_so_a_retry_rebuilds_the_same_c
     res, _, backend, _ = _go(tmp_path)
     rebuilt = ExperimentRequest(**backend.rows[0]["request"])
     assert [c.exp_id for c in expand(rebuilt)] == [c.exp_id for c in expand(_req())]
+
+
+# ---- --plan live usage ------------------------------------------------------------------------
+
+def test_plan_usage_reads_both_live_inputs():
+    from soamp.runs.launcher import plan_usage
+
+    assert plan_usage(lambda: 2, lambda: 12.5) == (2, 12.5, [])
+
+
+def test_plan_usage_falls_back_per_input_and_says_which():
+    from soamp.runs.launcher import plan_usage
+
+    def boom():
+        raise RuntimeError("no key")
+
+    assert plan_usage(boom, lambda: 3.0) == (0, 3.0, ["instance count"])
+    assert plan_usage(lambda: 1, boom) == (1, 0.0, ["24h spend"])
+    assert plan_usage(boom, boom) == (0, 0.0, ["instance count", "24h spend"])
+
+
+def test_plan_refuses_when_live_spend_pushes_past_the_24h_cap():
+    from soamp.runs.budget import estimate, violations
+    from soamp.runs.launcher import plan_usage
+
+    req = ExperimentRequest(experiment="cap_unit", representations={"peptide": ["rdkit"], "organism": ["vocab"]},
+                            architectures=[{"name": "baseline_classifier", "epochs": 2}])
+    limits = Limits(max_cells=50, max_concurrent_instances=2, max_hours_per_instance=4, max_cost_per_request_usd=10,
+                    max_cost_per_24h_usd=10, safety_margin=1.0)
+    est = estimate(expand(req), CostModel(minutes_per_100_epochs={"rdkit": 10.0}, assumed_price_per_hour_usd=1.0), limits)
+    running, spend, _ = plan_usage(lambda: 0, lambda: 9.99)
+    assert any("24h" in p or "24 h" in p for p in violations(est, limits, instances_running=running, spend_last_24h_usd=spend))
+    running, spend, _ = plan_usage(lambda: 2, lambda: 0.0)
+    assert any("max_concurrent_instances" in p for p in violations(est, limits, instances_running=running, spend_last_24h_usd=spend))

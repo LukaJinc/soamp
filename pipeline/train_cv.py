@@ -48,6 +48,7 @@ from soamp.engine.cross_validation import (
 )
 from soamp.engine.tracking import build_tracker, count_parameters
 from soamp.engine.tree_cv import count_tree_parameters, train_and_evaluate_fold_tree
+from soamp.features.organism_featurizers import organism_method_kwargs_from_artifact
 from soamp.model.factory import build_model
 from soamp.utils.config import load_config
 from soamp.utils.device import resolve_device
@@ -122,7 +123,11 @@ def main() -> None:
     with open(CFG.paths.data_dir / CFG.input_files.peptide_feature_scaler_filename) as f:
         peptide_method = json.load(f)["method"]
     with open(CFG.paths.data_dir / CFG.input_files.organism_vocab_filename) as f:
-        organism_method = json.load(f)["method"]
+        organism_artifact = json.load(f)
+    organism_method = organism_artifact["method"]
+    # k-mer / DNABERT-S vectors are fixed per species: every fold reuses the artifact's
+    # table instead of recomputing it from genome FASTAs / the 16S table (absent on instances).
+    organism_method_kwargs = organism_method_kwargs_from_artifact(organism_artifact) or None
     log.info(f"peptide_method={peptide_method!r} organism_method={organism_method!r}")
 
     # PeptideCLM embeddings are frozen/deterministic and don't depend on
@@ -148,6 +153,7 @@ def main() -> None:
         peptide_method=peptide_method,
         peptide_method_kwargs=peptide_method_kwargs,
         organism_method=organism_method,
+        organism_method_kwargs=organism_method_kwargs,
     )
     run = build_tracker(
         preview_bundle,
@@ -237,6 +243,7 @@ def main() -> None:
                 peptide_method=peptide_method,
                 peptide_method_kwargs=peptide_method_kwargs,
                 organism_method=organism_method,
+                organism_method_kwargs=organism_method_kwargs,
                 params=CFG.model.active_kwargs(),
                 architecture=CFG.model.architecture,
                 class_balancing_mode=CFG.class_balancing.mode,
@@ -254,6 +261,7 @@ def main() -> None:
                 peptide_method=peptide_method,
                 peptide_method_kwargs=peptide_method_kwargs,
                 organism_method=organism_method,
+                organism_method_kwargs=organism_method_kwargs,
                 architecture=CFG.model.architecture,
                 architecture_kwargs=CFG.model.active_kwargs(),
                 graph_encoder_kwargs=CFG.model.graph_encoder.model_dump(),

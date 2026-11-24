@@ -39,8 +39,8 @@ def test_unknown_architecture_dataset_and_representation_rejected():
         _req(architectures=[{"name": "resnet", "hparams": {}}])
     with pytest.raises(ValidationError):
         _req(dataset="nope")
-    with pytest.raises(ValidationError, match="kmer"):
-        _req(representations={"peptide": ["rdkit"], "organism": ["kmer"]})
+    with pytest.raises(ValidationError, match="genome2vec"):
+        _req(representations={"peptide": ["rdkit"], "organism": ["genome2vec"]})
 
 
 def test_bad_experiment_slug_rejected():
@@ -191,6 +191,7 @@ def test_dev_v2_data_artifact_lists_every_cached_feature_file():
         "data/dev_v2/peptide_features_rdkit.csv", "data/dev_v2/peptide_feature_scaler_rdkit.json",
         "data/dev_v2/peptide_features_peptideclm.csv", "data/dev_v2/peptide_feature_scaler_peptideclm.json",
         "data/dev_v2/peptide_feature_scaler_molgraph.json", "data/dev_v2/organism_vocab_vocab_embedding.json",
+        "data/dev_v2/organism_vocab_kmer_composition.json", "data/dev_v2/organism_vocab_dnabert_s_16s.json",
     ]
 
 
