@@ -1,0 +1,26 @@
+# Regularised trees on PeptideCLM x vocab (follow-up to the dev_v2 baselines, where default trees
+# overfit with a fit-val MCC gap of ~0.55 and val loss bottomed out at round 56-82).
+# Lower learning rate, shallower trees / fewer leaves, row and column subsampling, L2.
+experiment: dev_v2_trees_reg_v1
+seeds: [42]
+representations:
+  peptide: [peptideclm]
+  organism: [vocab]
+architectures:
+  - name: xgboost_classifier
+    hparams:
+      n_estimators: 300
+      learning_rate: 0.05
+      max_depth: [3, 4, 6]
+      min_child_weight: [1, 5]
+      subsample: 0.8
+      colsample_bytree: 0.5
+      reg_lambda: 5.0
+  - name: hist_gradient_boosting_classifier
+    hparams:
+      max_iter: 300
+      learning_rate: 0.05
+      max_leaf_nodes: [8, 15, 31]
+      min_samples_leaf: 50
+      l2_regularization: 1.0
+      max_features: 0.5

@@ -1,0 +1,13 @@
+# Seed check of the two tree leaders of the dev_v2 baselines (HistGB and XGBoost on PeptideCLM,
+# repo-default hyperparameters): same cells as dev_v2_baseline_trees_v2 with two new seeds.
+# The molgraph neural leaders are in dev_v2_baseline_seeds_nets_v1.yaml (trees cannot read molgraph).
+experiment: dev_v2_baseline_seeds_trees_v1
+seeds: [7, 123]
+representations:
+  peptide: [peptideclm]
+  organism: [vocab]
+architectures:
+  - name: hist_gradient_boosting_classifier
+    hparams: {}
+  - name: xgboost_classifier
+    hparams: {}
