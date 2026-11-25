@@ -1,0 +1,15 @@
+# Weight decay + shorter training for the neural baselines on PeptideCLM and molgraph x vocab.
+# In dev_v2_baseline_v2 these peaked at epochs 2-22 and then overfit (weight decay was 0).
+# Same small architectures as the baseline, 20 epochs, weight decay 1e-3 vs 1e-2.
+experiment: dev_v2_nets_wd_v1
+seeds: [42]
+representations:
+  peptide: [peptideclm, molgraph]
+  organism: [vocab]
+architectures:
+  - name: baseline_classifier
+    epochs: 20
+    hparams: {organism_embed_dim: 8, hidden_dims: [32, 16], weight_decay: [1.0e-3, 1.0e-2]}
+  - name: attention_fusion_classifier
+    epochs: 20
+    hparams: {projection_dim: 32, num_attention_heads: 2, num_attention_layers: 1, hidden_dims: [32, 16], weight_decay: [1.0e-3, 1.0e-2]}

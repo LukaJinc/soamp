@@ -1,0 +1,14 @@
+# dev_v2 baselines, tree half: the vector peptide representations x vocab organism
+# (tree models cannot read molgraph), every hyperparameter at the repo default
+# (src/soamp/engine/config.py), 5-fold CV, one seed.
+# Neural half: dev_v2_baseline_v2.yaml. Supersedes dev_v2_baseline_grid_trees_v1 (tuned lr 0.05, never launched).
+experiment: dev_v2_baseline_trees_v2
+seeds: [42]
+representations:
+  peptide: [rdkit, peptideclm]
+  organism: [vocab]
+architectures:
+  - name: hist_gradient_boosting_classifier
+    hparams: {}
+  - name: xgboost_classifier
+    hparams: {}

@@ -1,0 +1,26 @@
+# Is architecture the limit on dev_v2? Vector-input half (one instance):
+#  * logistic regression: a linear baseline. If it gets close to the best tree (val MCC ~0.457) and the
+#    molgraph nets (~0.46), the plateau is not about model capacity or attention. C axis for regularisation.
+#    It cannot read molgraph (no fixed-length vector), so molgraph is covered by the nets request.
+#  * organism-input ablation for the best tree so far (cycle 2: XGBoost depth 8, colsample 0.5, 600 rounds,
+#    lr 0.05; val MCC 0.4565 on PeptideCLM). `vocab` re-runs it as the paired control, `none` gives every
+#    organism the same constant input. The grid also yields the rdkit pair for free.
+experiment: dev_v2_arch_limit_vec_v1
+seeds: [42]
+representations:
+  peptide: [rdkit, peptideclm]
+  organism: [vocab, none]
+architectures:
+  - name: logistic_regression_classifier
+    hparams:
+      C: [0.01, 0.1, 1.0]
+      max_iter: 2000
+  - name: xgboost_classifier
+    hparams:
+      n_estimators: 600
+      learning_rate: 0.05
+      max_depth: 8
+      min_child_weight: 1
+      subsample: 0.8
+      colsample_bytree: 0.5
+      reg_lambda: 5.0

@@ -38,6 +38,7 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
 
 from soamp.data.factory import build_dataset
 from soamp.data.torch_dataset import LABEL_TO_INT
@@ -47,6 +48,7 @@ from soamp.engine.metrics import compute_binary_metrics, logits_to_predictions
 
 HGB = "hist_gradient_boosting_classifier"
 XGB = "xgboost_classifier"
+LOGREG = "logistic_regression_classifier"   # linear baseline: one fit = one "round"
 _XGB_WORKER = Path(__file__).with_name("xgb_worker.py")   # see that file for why XGBoost runs in its own process
 
 
@@ -73,6 +75,19 @@ class _FittedHGB(_FittedTree):
 
     def staged_logits(self, name):
         return self.model.staged_decision_function(self.sets[name])
+
+    def logits(self, name):
+        return np.asarray(self.model.decision_function(self.sets[name]), dtype=float)
+
+
+class _FittedLogReg(_FittedTree):
+    """A single fit, exposed as one round so the curves/snapshots code needs no special case."""
+
+    def __init__(self, model: LogisticRegression, sets: dict[str, np.ndarray]):
+        self.model, self.sets, self.n_rounds = model, sets, 1
+
+    def staged_logits(self, name):
+        yield self.logits(name)
 
     def logits(self, name):
         return np.asarray(self.model.decision_function(self.sets[name]), dtype=float)
@@ -117,7 +132,11 @@ def fit_tree(architecture: str, params: dict, x: np.ndarray, y: np.ndarray, samp
         return _FittedHGB(model, sets)
     if architecture == XGB:
         return _FittedXGB(_run_xgb_worker(params, seed, x, y, sample_weight, sets))
-    raise TreeModelError(f"unknown tree architecture {architecture!r}; known: {[HGB, XGB]}")
+    if architecture == LOGREG:
+        model = LogisticRegression(C=params["C"], max_iter=params["max_iter"], solver="lbfgs", random_state=seed)
+        model.fit(x, y, sample_weight=sample_weight)
+        return _FittedLogReg(model, sets)
+    raise TreeModelError(f"unknown tree architecture {architecture!r}; known: {[HGB, XGB, LOGREG]}")
 
 
 def weighted_bce_from_logits(logits: np.ndarray, labels: np.ndarray, pos_weight: float | None) -> float:
@@ -148,9 +167,12 @@ def dataset_to_matrix(dataset, *, organism_vocab_size: int | None, organism_outp
     return np.hstack([peptide_x, organism_x]), np.asarray(labels, dtype=int)
 
 
-def count_tree_parameters(params: dict, architecture: str = HGB) -> int:
+def count_tree_parameters(params: dict, architecture: str = HGB, n_features: int | None = None) -> int:
     """Upper bound on leaves (rounds x max leaves per tree) -- the tree analogue of n_parameters.
-    HGB: ``max_iter * max_leaf_nodes``; XGBoost: ``n_estimators * 2**max_depth``."""
+    HGB: ``max_iter * max_leaf_nodes``; XGBoost: ``n_estimators * 2**max_depth``;
+    logistic regression: weights + bias (``n_features + 1``, 0 if the width is unknown)."""
+    if architecture == LOGREG:
+        return int(n_features) + 1 if n_features is not None else 0
     if architecture == XGB:
         return int(params["n_estimators"]) * 2 ** int(params["max_depth"])
     return int(params["max_iter"]) * int(params["max_leaf_nodes"])

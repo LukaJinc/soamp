@@ -1,0 +1,26 @@
+# Cycle 2 of the tuning loop (after dev_v2_trees_reg_v1): the best regularised XGBoost was the
+# deepest (depth 6) and its val loss was still falling near round 300, so try deeper trees, twice
+# the rounds and stronger column subsampling; HistGB gets more rounds and bigger trees.
+experiment: dev_v2_trees_reg_v2
+seeds: [42]
+representations:
+  peptide: [peptideclm]
+  organism: [vocab]
+architectures:
+  - name: xgboost_classifier
+    hparams:
+      n_estimators: [300, 600]
+      learning_rate: 0.05
+      max_depth: [6, 8]
+      min_child_weight: 1
+      subsample: 0.8
+      colsample_bytree: [0.3, 0.5]
+      reg_lambda: 5.0
+  - name: hist_gradient_boosting_classifier
+    hparams:
+      max_iter: 600
+      learning_rate: 0.05
+      max_leaf_nodes: [31, 63]
+      min_samples_leaf: 50
+      l2_regularization: 1.0
+      max_features: 0.5

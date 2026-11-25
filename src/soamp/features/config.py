@@ -110,7 +110,7 @@ class DnabertSConfig(BaseModel):
     embeddings_path: str = "data/organism_16s_dnabert_s.json"
 
 
-ORGANISM_METHODS = ("vocab_embedding", "kmer_composition", "dnabert_s_16s")
+ORGANISM_METHODS = ("vocab_embedding", "kmer_composition", "dnabert_s_16s", "constant")
 
 
 class OrganismFeaturizationConfig(BaseModel):
@@ -120,6 +120,8 @@ class OrganismFeaturizationConfig(BaseModel):
     vocab_embedding: VocabEmbeddingConfig = VocabEmbeddingConfig()
     kmer_composition: KmerCompositionConfig = KmerCompositionConfig()
     dnabert_s_16s: DnabertSConfig = DnabertSConfig()
+    # organism-input ablation (ConstantOrganismFeaturizer): same knobs as vocab_embedding
+    constant: VocabEmbeddingConfig = VocabEmbeddingConfig()
 
     @model_validator(mode="after")
     def _method_must_be_known(self) -> "OrganismFeaturizationConfig":

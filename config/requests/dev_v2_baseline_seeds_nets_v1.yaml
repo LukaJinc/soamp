@@ -1,0 +1,14 @@
+# Seed check of the two neural leaders of the dev_v2 baselines (MLP and attention fusion on
+# molgraph): same settings as dev_v2_baseline_v2 (small models, 50 epochs) with two new seeds.
+experiment: dev_v2_baseline_seeds_nets_v1
+seeds: [7, 123]
+representations:
+  peptide: [molgraph]
+  organism: [vocab]
+architectures:
+  - name: baseline_classifier
+    epochs: 50
+    hparams: {organism_embed_dim: 8, hidden_dims: [32, 16]}
+  - name: attention_fusion_classifier
+    epochs: 50
+    hparams: {projection_dim: 32, num_attention_heads: 2, num_attention_layers: 1, hidden_dims: [32, 16]}

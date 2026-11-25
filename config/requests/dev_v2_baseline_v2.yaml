@@ -1,0 +1,18 @@
+# dev_v2 baselines, neural half: every peptide representation x vocab organism, small models,
+# 50 epochs each (deep models overfit, so capacity stays low for this first approximation).
+# Optimiser settings (learning rate, weight decay, batch size) are left at the repo defaults.
+# 5-fold CV (default), one seed, dataset omitted on purpose (default is dev_v2).
+# Tree models cannot read molgraph, so they live in dev_v2_baseline_trees_v2.yaml.
+# Supersedes dev_v2_baseline_grid_v1 (40 epochs, never launched).
+experiment: dev_v2_baseline_v2
+seeds: [42]
+representations:
+  peptide: [rdkit, peptideclm, molgraph]
+  organism: [vocab]
+architectures:
+  - name: baseline_classifier
+    epochs: 50
+    hparams: {organism_embed_dim: 8, hidden_dims: [32, 16]}
+  - name: attention_fusion_classifier
+    epochs: 50
+    hparams: {projection_dim: 32, num_attention_heads: 2, num_attention_layers: 1, hidden_dims: [32, 16]}

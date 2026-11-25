@@ -1,0 +1,15 @@
+# Cycle 2 of the tuning loop (after dev_v2_nets_wd_v1): weight decay underfit while PeptideCLM nets
+# still peaked within a few epochs, which points at the learning rate (default 1e-3). Same small
+# architectures, 50 epochs, learning rate 1e-4 vs 3e-4, light weight decay 1e-4.
+experiment: dev_v2_nets_lr_v1
+seeds: [42]
+representations:
+  peptide: [peptideclm, molgraph]
+  organism: [vocab]
+architectures:
+  - name: baseline_classifier
+    epochs: 50
+    hparams: {organism_embed_dim: 8, hidden_dims: [32, 16], learning_rate: [1.0e-4, 3.0e-4], weight_decay: 1.0e-4}
+  - name: attention_fusion_classifier
+    epochs: 50
+    hparams: {projection_dim: 32, num_attention_heads: 2, num_attention_layers: 1, hidden_dims: [32, 16], learning_rate: [1.0e-4, 3.0e-4], weight_decay: 1.0e-4}
