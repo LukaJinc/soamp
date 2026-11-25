@@ -92,8 +92,19 @@ class XGBoostClassifierConfig(BaseModel):
     colsample_bytree: float = Field(default=1.0, gt=0, le=1.0)
 
 
-# Architectures trained by soamp.engine.tree_cv instead of the torch Trainer.
-TREE_ARCHITECTURES = frozenset({"hist_gradient_boosting_classifier", "xgboost_classifier"})
+class LogisticRegressionClassifierConfig(BaseModel):
+    """scikit-learn LogisticRegression (L2, lbfgs) on the same scaled peptide vector ++ organism
+    one-hot the tree models see: the linear baseline. A single fit, logged as one 'epoch'."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    C: float = Field(default=1.0, gt=0)   # inverse L2 strength (sklearn's name)
+    max_iter: int = Field(default=2000, ge=1)
+
+
+# Architectures trained by soamp.engine.tree_cv (scikit-learn/XGBoost, CPU) instead of the torch
+# Trainer. The name is historical: the linear baseline shares this path too.
+TREE_ARCHITECTURES = frozenset({"hist_gradient_boosting_classifier", "xgboost_classifier", "logistic_regression_classifier"})
 KNOWN_ARCHITECTURES = ("baseline_classifier", "attention_fusion_classifier", *sorted(TREE_ARCHITECTURES))
 
 
@@ -106,6 +117,7 @@ class ModelConfig(BaseModel):
     attention_fusion_classifier: AttentionFusionClassifierConfig = AttentionFusionClassifierConfig()
     hist_gradient_boosting_classifier: HistGradientBoostingClassifierConfig = HistGradientBoostingClassifierConfig()
     xgboost_classifier: XGBoostClassifierConfig = XGBoostClassifierConfig()
+    logistic_regression_classifier: LogisticRegressionClassifierConfig = LogisticRegressionClassifierConfig()
 
     @model_validator(mode="after")
     def _architecture_must_be_known(self) -> "ModelConfig":

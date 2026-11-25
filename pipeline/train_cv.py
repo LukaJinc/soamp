@@ -171,7 +171,11 @@ def main() -> None:
     # Every fold builds the same architecture, so one throwaway instance from
     # the preview bundle gives the exact trainable-parameter count to log.
     is_tree = CFG.model.architecture in TREE_ARCHITECTURES
-    run.summary["n_parameters"] = count_tree_parameters(CFG.model.active_kwargs(), CFG.model.architecture) if is_tree else count_parameters(build_model(
+    feat = preview_bundle.featurization
+    n_input_features = (feat.peptide_feature_dim or 0) + int(
+        (feat.organism_vocab_size if feat.organism_output_kind == "index" else feat.organism_feature_dim) or 0
+    )
+    run.summary["n_parameters"] = count_tree_parameters(CFG.model.active_kwargs(), CFG.model.architecture, n_input_features) if is_tree else count_parameters(build_model(
         preview_bundle, architecture=CFG.model.architecture,
         graph_encoder_kwargs=CFG.model.graph_encoder.model_dump(), **CFG.model.active_kwargs(),
     ))

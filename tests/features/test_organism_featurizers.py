@@ -215,3 +215,17 @@ def test_dnabert_s_artifact_round_trip_and_registry(tmp_path):
     assert isinstance(restored, DnabertSOrganismFeaturizer)
     assert restored.encode("Staphylococcus aureus") == [2.0] * 4
     assert restored.feature_dim == 4
+
+
+def test_constant_featurizer_maps_every_organism_to_one_index_and_round_trips():
+    from soamp.features.organism_featurizers import ConstantOrganismFeaturizer
+
+    f = build_organism_featurizer("constant")
+    assert isinstance(f, ConstantOrganismFeaturizer) and f.output_kind == "index"
+    f.fit(["Escherichia coli", "Staphylococcus aureus"])
+    assert f.vocab_size == 1 and f.feature_dim is None
+    assert {f.encode(o) for o in ("Escherichia coli", "Staphylococcus aureus", "never seen")} == {0}
+    art = f.to_artifact_dict()
+    assert art["method"] == "constant"
+    g = organism_featurizer_from_artifact(art)
+    assert isinstance(g, ConstantOrganismFeaturizer) and g.vocab_size == 1

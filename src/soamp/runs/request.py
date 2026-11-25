@@ -74,6 +74,8 @@ DATASETS: dict[str, dict] = {
         },
         "organism": {
             "vocab": ("organism_vocab_vocab_embedding.json", "vocab_embedding"),
+            # ablation: one constant organism index, the model sees only the peptide
+            "none": ("organism_vocab_constant.json", "constant"),
         },
         "required_artifacts": ["data/dev_v2/mic_classification_dataset.csv", "data/dev_v2/peptide_split.csv"],
         "prepare": {
@@ -93,6 +95,9 @@ DATASETS: dict[str, dict] = {
             "organism": {
                 "vocab": [
                     (["python", "pipeline/features/02_build_organism_vocab.py", "--config", "config/features/dev_v2_organism_vocab.yaml"], ["data/dev_v2/organism_vocab_vocab_embedding.json"]),
+                ],
+                "none": [
+                    (["python", "pipeline/features/02_build_organism_vocab.py", "--config", "config/features/dev_v2_organism_none.yaml"], ["data/dev_v2/organism_vocab_constant.json"]),
                 ],
             },
         },
@@ -183,6 +188,13 @@ class XGBoostHParams(_HParams):
     colsample_bytree: float | list[float] | None = None
 
 
+class LogisticRegressionHParams(_HParams):
+    """Linear baseline (scikit-learn LogisticRegression, L2, lbfgs): ``C`` = inverse regularisation."""
+
+    C: float | list[float] | None = None
+    max_iter: int | list[int] | None = None
+
+
 @dataclass(frozen=True)
 class ArchSpec:
     tag: str  # short name used in run names
@@ -197,6 +209,7 @@ ARCHITECTURES: dict[str, ArchSpec] = {
     "attention_fusion_classifier": ArchSpec("attn", AttentionFusionHParams),
     "hist_gradient_boosting_classifier": ArchSpec("hgb", HistGradientBoostingHParams, uses_common=False, vector_only=True, rounds_param="max_iter"),
     "xgboost_classifier": ArchSpec("xgb", XGBoostHParams, uses_common=False, vector_only=True, rounds_param="n_estimators"),
+    "logistic_regression_classifier": ArchSpec("logreg", LogisticRegressionHParams, uses_common=False, vector_only=True),
 }
 COMMON_FIELDS = tuple(CommonHParams.model_fields)
 
@@ -229,7 +242,8 @@ class ArchitectureRequest(BaseModel):
     def _validate_hparams(self) -> "ArchitectureRequest":
         spec = ARCHITECTURES[self.name]
         if not spec.uses_common and self.epochs is not None:
-            raise ValueError(f"architecture {self.name!r} has no epochs; set hparams.{spec.rounds_param} (boosting rounds) instead")
+            hint = f"; set hparams.{spec.rounds_param} (boosting rounds) instead" if spec.rounds_param else " (it is fitted once)"
+            raise ValueError(f"architecture {self.name!r} has no epochs{hint}")
         common, specific = self._split()
         # extra="forbid" on both models turns a foreign/typo'd key into an error that
         # names the architecture, instead of silently dropping it.

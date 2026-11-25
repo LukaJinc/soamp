@@ -25,8 +25,8 @@ def _fold(**kw):
     rows = _rows(60)
     groups = {"fit": rows[:40], "val": rows[40:]}
     return rows, train_and_evaluate_fold_tree(
-        groups, seed=kw.pop("seed", 0), peptide_method="rdkit_descriptors", organism_method="vocab_embedding",
-        params=kw.pop("params", PARAMS), **kw)
+        groups, seed=kw.pop("seed", 0), peptide_method="rdkit_descriptors",
+        organism_method=kw.pop("organism_method", "vocab_embedding"), params=kw.pop("params", PARAMS), **kw)
 
 
 def test_weighted_bce_matches_torch():
@@ -102,3 +102,20 @@ def test_config_registers_the_tree_architecture_and_counts_parameters():
     assert count_tree_parameters(m.active_kwargs()) == 200 * 31
     with pytest.raises(ValueError):
         ModelConfig(architecture="resnet")
+
+
+def test_logistic_regression_is_one_round_with_the_same_contract():
+    entries, snaps = [], []
+    rows, (metrics, results) = _fold(params={"C": 1.0, "max_iter": 500}, architecture="logistic_regression_classifier",
+                                     on_epoch_end=entries.append, snapshot_every_n_epochs=2, on_snapshot=snaps.append)
+    assert [e["epoch"] for e in entries] == [1] and [s["epoch"] for s in snaps] == [1]
+    assert results["eval_group"].value_counts().to_dict() == {"fit": 40, "val": 20}
+    assert snaps[0]["metrics"]["val"]["mcc"] == pytest.approx(metrics["val"]["mcc"])
+    assert "logistic_regression_classifier" in TREE_ARCHITECTURES
+    m = ModelConfig(architecture="logistic_regression_classifier")
+    assert count_tree_parameters(m.active_kwargs(), m.architecture, n_features=10) == 11
+
+
+def test_constant_organism_ablation_removes_the_organism_signal():
+    rows, (m_none, res_none) = _fold(organism_method="constant")
+    assert set(m_none) == {"fit", "val"}

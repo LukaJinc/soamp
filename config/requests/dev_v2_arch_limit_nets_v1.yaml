@@ -1,0 +1,15 @@
+# Is architecture the limit on dev_v2? Graph-input half: organism-input ablation for the molgraph MLP and attention fusion
+# at their dev_v2_baseline_v2 settings (val MCC 0.453 / 0.463). `vocab` is the paired control, `none`
+# gives every organism the same constant input (attention then has nothing organism-specific to attend).
+experiment: dev_v2_arch_limit_nets_v1
+seeds: [42]
+representations:
+  peptide: [molgraph]
+  organism: [vocab, none]
+architectures:
+  - name: baseline_classifier
+    epochs: 50
+    hparams: {organism_embed_dim: 8, hidden_dims: [32, 16]}
+  - name: attention_fusion_classifier
+    epochs: 50
+    hparams: {projection_dim: 32, num_attention_heads: 2, num_attention_layers: 1, hidden_dims: [32, 16]}

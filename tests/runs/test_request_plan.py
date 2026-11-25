@@ -191,6 +191,7 @@ def test_dev_v2_data_artifact_lists_every_cached_feature_file():
         "data/dev_v2/peptide_features_rdkit.csv", "data/dev_v2/peptide_feature_scaler_rdkit.json",
         "data/dev_v2/peptide_features_peptideclm.csv", "data/dev_v2/peptide_feature_scaler_peptideclm.json",
         "data/dev_v2/peptide_feature_scaler_molgraph.json", "data/dev_v2/organism_vocab_vocab_embedding.json",
+        "data/dev_v2/organism_vocab_constant.json",
     ]
 
 
@@ -225,3 +226,41 @@ def test_xgboost_rejected_with_molgraph_and_cell_config_validates(tmp_path):
         assert cfg.model.architecture == "xgboost_classifier"
         assert (cfg.model.xgboost_classifier.n_estimators, cfg.model.xgboost_classifier.max_depth,
                 cfg.model.xgboost_classifier.subsample) == (50, 4, 0.8)
+
+
+# ---- logistic regression baseline + organism ablation ------------------------------------------
+
+def test_logistic_regression_has_its_own_hparams_no_epochs_and_no_molgraph(tmp_path):
+    req = _req(architectures=[{"name": "logistic_regression_classifier", "hparams": {"C": [0.1, 1.0]}}])
+    cells = expand(req)
+    assert len(cells) == 2 * 2  # C x 2 peptide representations
+    body = cells[0].config
+    assert body["model"] == {"architecture": "logistic_regression_classifier", "logistic_regression_classifier": {"C": 0.1}}
+    assert "optim" not in body and "epochs" not in body["loop"]
+    assert cells[0].exp_id.split("__")[1] == "logreg"
+    with pytest.raises(ValidationError, match="no epochs"):
+        _req(architectures=[{"name": "logistic_regression_classifier", "epochs": 10}])
+    with pytest.raises(ValidationError, match="logistic_regression_classifier"):
+        _req(architectures=[{"name": "logistic_regression_classifier", "hparams": {"max_depth": 3}}])
+    with pytest.raises(ValidationError, match="molgraph"):
+        _req(representations={"peptide": ["molgraph"], "organism": ["vocab"]}, architectures=[{"name": "logistic_regression_classifier"}])
+    shutil.copytree(REPO_ROOT / "config/train", tmp_path / "config/train", ignore=shutil.ignore_patterns("generated"))
+    for p in write_cell_configs(req, cells, repo_root=tmp_path):
+        cfg = load_config(tmp_path / p, TrainConfig)
+        assert cfg.model.architecture == "logistic_regression_classifier"
+        assert cfg.model.logistic_regression_classifier.max_iter == 2000
+
+
+def test_organism_none_ablation_cells_use_the_constant_vocab_and_its_prepare_step():
+    from soamp.runs.launch_plan import build_run_spec
+    from soamp.runs.spec import InstanceSpec
+
+    req = _req(representations={"peptide": ["molgraph"], "organism": ["vocab", "none"]},
+               architectures=[{"name": "baseline_classifier", "epochs": 5}])
+    cells = expand(req)
+    assert sorted(c.organism for c in cells) == ["none", "vocab"]
+    none = next(c for c in cells if c.organism == "none")
+    assert none.config["input_files"]["organism_vocab_filename"] == "organism_vocab_constant.json"
+    assert "constant" in none.config["wandb_tags"] and "__molgraph_none__" in none.exp_id
+    spec = build_run_spec(req, cells, InstanceSpec())
+    assert any("config/features/dev_v2_organism_none.yaml" in st.cmd for st in spec.prepare)

@@ -1,0 +1,9 @@
+# Organism-input ablation for the dev v2 dataset: every organism maps to one constant index, so models
+# see only the peptide (soamp.features.organism_featurizers.ConstantOrganismFeaturizer). Launcher name: `none`.
+_base_: dev_v2_organism_vocab.yaml
+
+organism_featurization:
+  method: constant
+
+output_files:
+  organism_vocab_filename: organism_vocab_constant.json

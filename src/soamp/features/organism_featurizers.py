@@ -286,7 +286,29 @@ class DnabertSOrganismFeaturizer:
         }
 
 
+class ConstantOrganismFeaturizer(VocabEmbeddingOrganismFeaturizer):
+    """Organism-input ablation: every organism maps to the same single index (vocab size 1).
+
+    The model architecture stays identical (an embedding of size 1 for the nets, a constant one-hot
+    column for the trees and logistic regression), but the organism input carries no information,
+    so the model can only rank peptides. Comparing a cell against its ``vocab_embedding`` twin
+    measures how much the organism input contributes."""
+
+    METHOD = "constant"
+
+    def __init__(self, unknown_index: int = 0, vocab: dict[str, int] | None = None) -> None:
+        super().__init__(unknown_index=unknown_index, vocab={})
+
+    def fit(self, fit_organisms: list[str]) -> None:
+        self.vocab = {}
+
+    def to_artifact_dict(self) -> dict:
+        return {"method": self.METHOD, "unknown_index": self.unknown_index, "vocab_size": 1, "vocab": {}}
+
+
 def build_organism_featurizer(method: str, **method_kwargs) -> OrganismFeaturizer:
+    if method == ConstantOrganismFeaturizer.METHOD:
+        return ConstantOrganismFeaturizer(**method_kwargs)
     if method == "vocab_embedding":
         return VocabEmbeddingOrganismFeaturizer(**method_kwargs)
     if method == "kmer_composition":
@@ -302,6 +324,8 @@ def organism_featurizer_from_artifact(data: dict) -> OrganismFeaturizer:
     without re-fetching/recomputing anything -- used by
     src/soamp/data/factory.py::_build_dataset_from_artifacts."""
     method = data["method"]
+    if method == ConstantOrganismFeaturizer.METHOD:
+        return ConstantOrganismFeaturizer(unknown_index=data.get("unknown_index", 0))
     if method == "vocab_embedding":
         return VocabEmbeddingOrganismFeaturizer(
             unknown_index=data["unknown_index"], vocab=data["vocab"],
