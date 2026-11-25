@@ -1,0 +1,15 @@
+# Cycle 3 of the tuning loop (after dev_v2_nets_lr_v1): lower learning rates did not improve nets,
+# and molgraph is the only input where nets match the trees. Default learning rate, light weight decay,
+# 30 epochs; batch size 128 vs 512 and head width [32,16] vs [64,32].
+experiment: dev_v2_nets_molgraph_v1
+seeds: [42]
+representations:
+  peptide: [molgraph]
+  organism: [vocab]
+architectures:
+  - name: baseline_classifier
+    epochs: 30
+    hparams: {organism_embed_dim: 8, hidden_dims: [[32, 16], [64, 32]], batch_size: [128, 512], weight_decay: 1.0e-4}
+  - name: attention_fusion_classifier
+    epochs: 30
+    hparams: {projection_dim: 32, num_attention_heads: 2, num_attention_layers: 1, hidden_dims: [[32, 16], [64, 32]], batch_size: [128, 512], weight_decay: 1.0e-4}

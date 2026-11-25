@@ -1,0 +1,26 @@
+# Cycle 3 of the tuning loop (after dev_v2_trees_reg_v2): depth-8 XGBoost with 600 rounds had the best
+# tree val MCC (0.4565) but its val loss rose after round ~166. Slower learning rates (0.02, 0.03) with
+# depth 8 vs 10 test whether MCC and calibration can improve together; HistGB gets 63 vs 127 leaves.
+experiment: dev_v2_trees_reg_v3
+seeds: [42]
+representations:
+  peptide: [peptideclm]
+  organism: [vocab]
+architectures:
+  - name: xgboost_classifier
+    hparams:
+      n_estimators: 600
+      learning_rate: [0.02, 0.03]
+      max_depth: [8, 10]
+      min_child_weight: 1
+      subsample: 0.8
+      colsample_bytree: 0.5
+      reg_lambda: 5.0
+  - name: hist_gradient_boosting_classifier
+    hparams:
+      max_iter: 600
+      learning_rate: [0.02, 0.03]
+      max_leaf_nodes: [63, 127]
+      min_samples_leaf: 50
+      l2_regularization: 1.0
+      max_features: 0.5
