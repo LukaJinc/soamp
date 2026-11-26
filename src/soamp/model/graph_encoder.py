@@ -9,7 +9,7 @@ dropout, LayerNorm and weight decay (config) are the regularisers.
 import torch
 from torch import nn
 
-from soamp.data.graph_batch import GraphBatch
+from soamp.data.graph_batch import GraphBatch, GraphVectorBatch
 
 # Sum pooling carries molecule size (mean/max cannot see how many atoms there
 # are, and size -- MolWt / HeavyAtomCount -- is among the strongest signals in
@@ -90,3 +90,18 @@ class GraphPeptideClassifier(nn.Module):
 
     def forward(self, graphs: GraphBatch, organism_input: torch.Tensor) -> torch.Tensor:
         return self.classifier(self.peptide_encoder(graphs), organism_input)
+
+
+class GraphVectorPeptideClassifier(nn.Module):
+    """GINEncoder(graph) concatenated with a fixed peptide vector (e.g. the
+    frozen PeptideCLM embedding) -> any existing fusion classifier, which sees
+    one peptide vector of size encoder.out_dim + vector_dim."""
+
+    def __init__(self, peptide_encoder: GINEncoder, classifier: nn.Module) -> None:
+        super().__init__()
+        self.peptide_encoder = peptide_encoder
+        self.classifier = classifier
+
+    def forward(self, peptide: GraphVectorBatch, organism_input: torch.Tensor) -> torch.Tensor:
+        fused = torch.cat([self.peptide_encoder(peptide.graphs), peptide.vectors], dim=-1)
+        return self.classifier(fused, organism_input)

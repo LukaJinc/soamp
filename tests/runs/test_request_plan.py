@@ -190,8 +190,24 @@ def test_dev_v2_data_artifact_lists_every_cached_feature_file():
         "data/dev_v2/mic_classification_dataset.csv", "data/dev_v2/peptide_split.csv",
         "data/dev_v2/peptide_features_rdkit.csv", "data/dev_v2/peptide_feature_scaler_rdkit.json",
         "data/dev_v2/peptide_features_peptideclm.csv", "data/dev_v2/peptide_feature_scaler_peptideclm.json",
-        "data/dev_v2/peptide_feature_scaler_molgraph.json", "data/dev_v2/organism_vocab_vocab_embedding.json",
+        "data/dev_v2/peptide_feature_scaler_molgraph.json",
+        "data/dev_v2/peptide_feature_scaler_molgraph_pool.json",
+        "data/dev_v2/peptide_feature_scaler_peptideclm_molgraph_pool.json",
+        "data/dev_v2/peptide_feature_scaler_peptideclm_molgraph.json",
+        "data/dev_v2/organism_vocab_vocab_embedding.json",
     ]
+
+
+def test_combined_inputs_trees_take_pooled_vectors_but_not_the_gnn_hybrid():
+    pooled = _req(representations={"peptide": ["molgraph_pool", "peptideclm_molgraph_pool"], "organism": ["vocab"]},
+                  architectures=[{"name": "xgboost_classifier", "hparams": {"max_depth": 8}}])
+    assert {c.peptide for c in expand(pooled)} == {"molgraph_pool", "peptideclm_molgraph_pool"}
+    with pytest.raises(ValidationError, match="vector peptide representation"):
+        _req(representations={"peptide": ["peptideclm_molgraph"], "organism": ["vocab"]},
+             architectures=[{"name": "xgboost_classifier", "hparams": {}}])
+    hybrid = _req(representations={"peptide": ["peptideclm_molgraph"], "organism": ["vocab"]},
+                  architectures=[{"name": "baseline_classifier", "hparams": {}, "epochs": 2}])
+    assert expand(hybrid)[0].config["input_files"]["peptide_feature_scaler_filename"] == "peptide_feature_scaler_peptideclm_molgraph.json"
 
 
 # ---- XGBoost architecture ---------------------------------------------------------------------

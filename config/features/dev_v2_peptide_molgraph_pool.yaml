@@ -1,0 +1,6 @@
+# Pooled molecular-graph vector (151 counts/fractions: atoms, bonds, element pairs), for the dev v2 dataset (data/dev_v2/). Same method as peptide_molgraph_pool.yaml; only the data dir moves.
+_base_: peptide_molgraph_pool.yaml
+
+paths:
+  data_dir: data/dev_v2
+  reports_dir: reports/dev_v2

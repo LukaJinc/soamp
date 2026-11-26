@@ -7,6 +7,11 @@ minutes_per_100_epochs:
   rdkit: 5.0
   peptideclm: 15.0
   molgraph: 14.0
+  # combined inputs (2026-11-26, guesses from their parts): pooled graph vector ~ rdkit-sized;
+  # PeptideCLM ++ pooled graph ~ PeptideCLM; PeptideCLM ++ trainable GNN ~ molgraph + the embedding pass
+  molgraph_pool: 5.0
+  peptideclm_molgraph_pool: 15.0
+  peptideclm_molgraph: 20.0
 default_epochs: 30
 # per instance: boot, uv + torch install, data download, feature build (guess)
 instance_overhead_minutes: 15.0

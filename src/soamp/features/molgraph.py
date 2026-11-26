@@ -112,3 +112,73 @@ def smiles_to_graph(smiles: str) -> MolGraph:
     edge_index = np.asarray([sources, targets], dtype=np.int64).reshape(2, -1)
     edge_feats = np.asarray(edge_rows, dtype=np.float32).reshape(-1, EDGE_DIM)
     return MolGraph(node_feats=node_feats, edge_index=edge_index, edge_feats=edge_feats)
+
+
+# ---------------------------------------------------------------------------
+# Fixed-length (parameter-free) summary of a MolGraph, for models that cannot
+# take a graph (trees) or to concatenate with another vector (PeptideCLM).
+# Everything is a count or a fraction read straight off the graph's own
+# one-hot node/edge features, so it is a fixed function of the SMILES.
+# ---------------------------------------------------------------------------
+
+def _slot_names(prefix: str, choices: list, labels: list[str] | None = None) -> list[str]:
+    names = labels if labels is not None else [str(c) for c in choices]
+    return [f"{prefix}_{n}" for n in names] + [f"{prefix}_other"]
+
+
+_NODE_SLOT_NAMES = (
+    _slot_names("elem", _ELEMENTS)
+    + _slot_names("deg", _DEGREES)
+    + _slot_names("charge", _CHARGES)
+    + _slot_names("hyb", _HYBRIDIZATIONS, ["sp", "sp2", "sp3"])
+    + ["aromatic"]
+    + _slot_names("nh", _NUM_HS)
+    + ["ring"]
+    + _slot_names("chiral", _CHIRAL_TAGS, ["none", "cw", "ccw"])
+)
+_EDGE_SLOT_NAMES = (
+    _slot_names("bond", _BOND_TYPES, ["single", "double", "triple", "aromatic"])
+    + ["conjugated", "ring"]
+    + _slot_names("stereo", _BOND_STEREO, ["none", "z", "e"])
+)
+assert len(_NODE_SLOT_NAMES) == NODE_DIM and len(_EDGE_SLOT_NAMES) == EDGE_DIM
+
+_N_ELEM = len(_ELEMENTS) + 1
+# unordered element pairs over bonds (C-N, C-O, ...): the 1-hop atom-environment signal
+_ELEM_PAIRS = [(i, j) for i in range(_N_ELEM) for j in range(i, _N_ELEM)]
+_ELEM_LABELS = _ELEMENTS + ["other"]
+
+POOLED_FEATURE_NAMES: list[str] = (
+    ["mg_n_atoms", "mg_n_bonds"]
+    + [f"mg_atom_count_{n}" for n in _NODE_SLOT_NAMES]
+    + [f"mg_atom_frac_{n}" for n in _NODE_SLOT_NAMES]
+    + [f"mg_bond_count_{n}" for n in _EDGE_SLOT_NAMES]
+    + [f"mg_bond_frac_{n}" for n in _EDGE_SLOT_NAMES]
+    + [f"mg_pair_{_ELEM_LABELS[i]}_{_ELEM_LABELS[j]}" for i, j in _ELEM_PAIRS]
+)
+
+
+def pooled_graph_features(graph: MolGraph) -> np.ndarray:
+    """(len(POOLED_FEATURE_NAMES),) float32: atom/bond counts, per-slot atom and
+    bond counts and fractions, and element-pair bond counts."""
+    n_atoms = graph.num_nodes
+    # edge_index stores each bond twice (both directions): halve sums to count bonds
+    bond_sum = graph.edge_feats.sum(axis=0) / 2.0
+    n_bonds = graph.edge_feats.shape[0] / 2.0
+    atom_sum = graph.node_feats.sum(axis=0)
+
+    elem = graph.node_feats[:, :_N_ELEM].argmax(axis=1)
+    pairs = np.zeros((_N_ELEM, _N_ELEM), dtype=np.float64)
+    if graph.edge_index.shape[1]:
+        src, dst = graph.edge_index
+        np.add.at(pairs, (elem[src], elem[dst]), 1.0)
+    pairs = pairs / 2.0  # each bond visited in both directions
+    sym = pairs + pairs.T - np.diag(np.diag(pairs))  # unordered counts on the upper triangle
+    pair_counts = [sym[i, j] for i, j in _ELEM_PAIRS]
+
+    return np.concatenate([
+        [n_atoms, n_bonds],
+        atom_sum, atom_sum / max(n_atoms, 1),
+        bond_sum, bond_sum / max(n_bonds, 1.0),
+        pair_counts,
+    ]).astype(np.float32)

@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Literal
 
 from soamp.model.attention_fusion import AttentionFusionClassifier
 from soamp.model.baseline_mlp import BaselineClassifier
-from soamp.model.graph_encoder import GINEncoder, GraphPeptideClassifier
+from soamp.model.graph_encoder import GINEncoder, GraphPeptideClassifier, GraphVectorPeptideClassifier
 
 if TYPE_CHECKING:
     from soamp.data.factory import DatasetBundle
@@ -32,7 +32,7 @@ def build_model(
     organism_output_kind: Literal["index", "vector"] = "index",
     organism_vocab_size: int | None = None,
     organism_feature_dim: int | None = None,
-    peptide_input_kind: Literal["vector", "graph"] = "vector",
+    peptide_input_kind: Literal["vector", "graph", "graph_vector"] = "vector",
     graph_node_dim: int | None = None,
     graph_edge_dim: int | None = None,
     graph_encoder_kwargs: dict | None = None,
@@ -52,14 +52,19 @@ def build_model(
         organism_feature_dim = dataset_bundle.featurization.organism_feature_dim
 
     peptide_encoder = None
-    if peptide_input_kind == "graph":
+    if peptide_input_kind in ("graph", "graph_vector"):
         if graph_node_dim is None or graph_edge_dim is None:
             raise ModelFactoryError(
-                "peptide_input_kind='graph' needs graph_node_dim and graph_edge_dim "
+                f"peptide_input_kind={peptide_input_kind!r} needs graph_node_dim and graph_edge_dim "
                 "(or a dataset_bundle)"
             )
+        if peptide_input_kind == "graph_vector" and peptide_feature_dim is None:
+            raise ModelFactoryError("peptide_input_kind='graph_vector' needs peptide_feature_dim (the vector part)")
         peptide_encoder = GINEncoder(graph_node_dim, graph_edge_dim, **(graph_encoder_kwargs or {}))
-        peptide_feature_dim = peptide_encoder.out_dim
+        # graph_vector: the classifier sees GNN output ++ the vector part
+        peptide_feature_dim = peptide_encoder.out_dim + (
+            peptide_feature_dim if peptide_input_kind == "graph_vector" else 0
+        )
     elif peptide_input_kind != "vector":
         raise ModelFactoryError(f"unknown peptide_input_kind: {peptide_input_kind!r}")
 
@@ -86,6 +91,8 @@ def build_model(
         classifier = AttentionFusionClassifier(**common_kwargs, **architecture_kwargs)
     else:
         raise ModelFactoryError(f"unknown architecture: {architecture!r}")
+    if peptide_encoder is not None and peptide_input_kind == "graph_vector":
+        return GraphVectorPeptideClassifier(peptide_encoder, classifier)
     if peptide_encoder is not None:
         return GraphPeptideClassifier(peptide_encoder, classifier)
     return classifier

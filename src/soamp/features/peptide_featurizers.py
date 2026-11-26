@@ -9,9 +9,16 @@ soamp.features.scaling.fit_scaler/apply_scaler and
 soamp.features.peptide.index_feature_rows_by_peptide_id pipeline regardless
 of which method produced them.
 """
+from functools import lru_cache
 from typing import Literal, Protocol
 
-from soamp.features.molgraph import EDGE_DIM, NODE_DIM, smiles_to_graph
+from soamp.features.molgraph import (
+    EDGE_DIM,
+    NODE_DIM,
+    POOLED_FEATURE_NAMES,
+    pooled_graph_features,
+    smiles_to_graph,
+)
 from soamp.features.peptide import DESCRIPTOR_NAMES, build_peptide_feature_rows
 
 
@@ -24,7 +31,9 @@ class PeptideFeaturizer(Protocol):
     # CSV-artifact pipeline). "graph": rows carry a `graph` (MolGraph) and the
     # model owns a trainable encoder -- see MolecularGraphFeaturizer. Mirrors
     # the organism side's `output_kind` contract.
-    input_kind: Literal["vector", "graph"]
+    # "graph_vector": rows carry BOTH a `graph` and named floats; the model
+    # encodes the graph with its GNN and concatenates the scaled vector.
+    input_kind: Literal["vector", "graph", "graph_vector"]
     feature_names: list[str]
 
     def fit(self, fit_unique_peptides: list[dict]) -> None: ...
@@ -188,6 +197,82 @@ class MolecularGraphFeaturizer:
         ]
 
 
+class MolecularGraphPooledFeaturizer:
+    """Fixed-length, parameter-free summary of the molecular graph (atom/bond
+    counts and fractions per one-hot slot, element-pair bond counts; see
+    soamp.features.molgraph.pooled_graph_features). The vector stand-in for
+    `molecular_graph`, usable by tree models and for concatenation."""
+
+    input_kind: Literal["vector"] = "vector"
+
+    def __init__(self) -> None:
+        self.feature_names = list(POOLED_FEATURE_NAMES)
+
+    def fit(self, fit_unique_peptides: list[dict]) -> None:
+        pass
+
+    def transform(self, unique_peptides: list[dict]) -> list[dict]:
+        return [
+            {"peptide_id": p["peptide_id"], **dict(zip(self.feature_names, _pooled_from_smiles(p["smiles"])))}
+            for p in unique_peptides
+        ]
+
+
+@lru_cache(maxsize=None)
+def _pooled_from_smiles(smiles: str) -> tuple[float, ...]:
+    # Exact (fixed function of the SMILES); cached because CV re-featurizes every fold.
+    return tuple(pooled_graph_features(smiles_to_graph(smiles)).tolist())
+
+
+class PeptideCLMMolGraphPooledFeaturizer:
+    """PeptideCLM embedding (dim_0..dim_767) concatenated with the pooled
+    molecular-graph vector (mg_*): one 919-d vector per peptide. kwargs go to
+    PeptideCLMFeaturizer (including the shared `cache`)."""
+
+    input_kind: Literal["vector"] = "vector"
+
+    def __init__(self, **peptideclm_kwargs) -> None:
+        self._clm = PeptideCLMFeaturizer(**peptideclm_kwargs)
+        self._graph = MolecularGraphPooledFeaturizer()
+        self.feature_names = self._clm.feature_names + self._graph.feature_names
+
+    def fit(self, fit_unique_peptides: list[dict]) -> None:
+        pass
+
+    def transform(self, unique_peptides: list[dict]) -> list[dict]:
+        clm_rows = self._clm.transform(unique_peptides)
+        graph_rows = self._graph.transform(unique_peptides)
+        return [{**c, **g} for c, g in zip(clm_rows, graph_rows)]
+
+
+class PeptideCLMMolGraphFeaturizer:
+    """Hybrid input for neural models: the molecular graph (encoded by the
+    model's trainable GNN) plus the frozen PeptideCLM embedding as a scaled
+    vector; the model concatenates the GNN output with the embedding. Rows
+    carry `graph` and dim_0..dim_767. kwargs go to PeptideCLMFeaturizer."""
+
+    input_kind: Literal["graph_vector"] = "graph_vector"
+    node_dim = NODE_DIM
+    edge_dim = EDGE_DIM
+
+    def __init__(self, **peptideclm_kwargs) -> None:
+        self._clm = PeptideCLMFeaturizer(**peptideclm_kwargs)
+        self.feature_names = list(self._clm.feature_names)
+
+    def fit(self, fit_unique_peptides: list[dict]) -> None:
+        pass
+
+    def transform(self, unique_peptides: list[dict]) -> list[dict]:
+        return [
+            {**row, "graph": smiles_to_graph(p["smiles"])}
+            for p, row in zip(unique_peptides, self._clm.transform(unique_peptides))
+        ]
+
+
+# Methods that embed with PeptideCLM (and so accept PeptideCLM kwargs + a shared `cache`).
+PEPTIDECLM_METHODS = ("peptideclm_embedding", "peptideclm_molgraph_pooled", "peptideclm_molgraph")
+
+
 def build_peptide_featurizer(method: str, **method_kwargs) -> PeptideFeaturizer:
     if method == "rdkit_descriptors":
         return RDKitDescriptorFeaturizer(**method_kwargs)
@@ -195,4 +280,10 @@ def build_peptide_featurizer(method: str, **method_kwargs) -> PeptideFeaturizer:
         return PeptideCLMFeaturizer(**method_kwargs)
     if method == "molecular_graph":
         return MolecularGraphFeaturizer(**method_kwargs)
+    if method == "molecular_graph_pooled":
+        return MolecularGraphPooledFeaturizer(**method_kwargs)
+    if method == "peptideclm_molgraph_pooled":
+        return PeptideCLMMolGraphPooledFeaturizer(**method_kwargs)
+    if method == "peptideclm_molgraph":
+        return PeptideCLMMolGraphFeaturizer(**method_kwargs)
     raise PeptideFeaturizerError(f"unknown peptide featurization method: {method!r}")
