@@ -1,0 +1,7 @@
+# RDKit descriptors (13-d) for the linear-only dev v2 dataset (data/dev_v2_linear/: the dev_v2 pairs whose peptide has no
+# intrachain bond and no macrocycle or disulfide; docs/dev_dataset_v2_linear.md). Same method as peptide_rdkit.yaml; only the data dir moves.
+_base_: peptide_rdkit.yaml
+
+paths:
+  data_dir: data/dev_v2_linear
+  reports_dir: reports/dev_v2_linear

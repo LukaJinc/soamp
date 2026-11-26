@@ -97,6 +97,41 @@ DATASETS: dict[str, dict] = {
             },
         },
     },
+    # dev_v2 filtered to the linear peptides (no intrachain bond, no macrocycle/disulfide in the
+    # SMILES), same labels and the same test + 5-fold assignment as dev_v2, so a cell's result is
+    # comparable to the dev_v2 result of the same cell (docs/dev_dataset_v2_linear.md).
+    "dev_v2_linear": {
+        "base_config": "cv_dev_v2_linear_base.yaml",
+        "peptide": {
+            "rdkit": ("peptide_features_rdkit.csv", "peptide_feature_scaler_rdkit.json", "rdkit_descriptors"),
+            "peptideclm": ("peptide_features_peptideclm.csv", "peptide_feature_scaler_peptideclm.json", "peptideclm_embedding"),
+            "molgraph": ("peptide_features_molgraph.csv", "peptide_feature_scaler_molgraph.json", "molecular_graph"),
+        },
+        "organism": {
+            "vocab": ("organism_vocab_vocab_embedding.json", "vocab_embedding"),
+        },
+        "required_artifacts": ["data/dev_v2_linear/mic_classification_dataset.csv", "data/dev_v2_linear/peptide_split.csv"],
+        "prepare": {
+            "peptide": {
+                "rdkit": [
+                    (["python", "pipeline/features/01_build_peptide_features.py", "--config", "config/features/dev_v2_linear_peptide_rdkit.yaml"], ["data/dev_v2_linear/peptide_features_rdkit.csv"]),
+                    (["python", "pipeline/features/03_fit_peptide_scaler.py", "--config", "config/features/dev_v2_linear_peptide_rdkit.yaml"], ["data/dev_v2_linear/peptide_feature_scaler_rdkit.json"]),
+                ],
+                "peptideclm": [
+                    (["python", "pipeline/features/01_build_peptide_features.py", "--config", "config/features/dev_v2_linear_peptide_peptideclm.yaml"], ["data/dev_v2_linear/peptide_features_peptideclm.csv"]),
+                    (["python", "pipeline/features/03_fit_peptide_scaler.py", "--config", "config/features/dev_v2_linear_peptide_peptideclm.yaml"], ["data/dev_v2_linear/peptide_feature_scaler_peptideclm.json"]),
+                ],
+                "molgraph": [
+                    (["python", "pipeline/features/03_fit_peptide_scaler.py", "--config", "config/features/dev_v2_linear_peptide_molgraph.yaml"], ["data/dev_v2_linear/peptide_feature_scaler_molgraph.json"]),
+                ],
+            },
+            "organism": {
+                "vocab": [
+                    (["python", "pipeline/features/02_build_organism_vocab.py", "--config", "config/features/dev_v2_linear_organism_vocab.yaml"], ["data/dev_v2_linear/organism_vocab_vocab_embedding.json"]),
+                ],
+            },
+        },
+    },
 }
 
 DEFAULT_DATASET = "dev_v2"   # a request that names no dataset means the seven-strain data
