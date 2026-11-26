@@ -19,7 +19,11 @@ Rule 1 alone would keep 4 peptides out of 8,478 whose generated SMILES does carr
 or an S-S bond; rule 2 alone would keep 25 whose SMILES looks linear although DBAASP records a
 bond (the SMILES generator falls back to the linear backbone when it cannot place the bond).
 Requiring both drops those 29 ambiguous peptides, so every peptide kept is linear under both
-the database annotation and the structure the model actually sees.
+the database annotation and the structure the model actually sees. The DBAASP flag is the primary
+source and rule 2 only cross-checks it: the four peptides the cross-check removes carry a
+tert-butyl disulfide protecting group or a lipoic-acid cap (sulfur in a side chain, not a backbone
+bridge), 5 pairs out of 12,722, so a dataset built from rule 1 alone would differ far below fold
+noise.
 """
 from __future__ import annotations
 

@@ -36,6 +36,14 @@ falls back to the plain backbone when it cannot place the bond — `soamp.curati
 Dropping them means every peptide kept is linear both in the database annotation and in the
 structure the model actually sees.
 
+The flag `is_linear` is the only linearity source in the repo, and it is what rule 1 uses -- the
+SMILES test is a cross-check on top of it, not a replacement. It changes the kept set by 4
+peptides and 5 pairs out of 12,722: peptides 17214 and 17215 (a tert-butyl disulfide protecting
+group on a cysteine) and 20063 and 20064 (a lipoic-acid cap, whose 1,2-dithiolane is a ring with
+an S-S). Their sulfur is in a side chain or a cap rather than a backbone bridge, so DBAASP's flag
+is arguably right about them and the conservative rule costs 5 pairs to be sure. Pass a dataset
+built from rule 1 alone if you would rather keep them: the difference is far below fold noise.
+
 Audit files: `reports/dev_v2_linear/peptide_linearity.csv` (one row per peptide: both flags and
 the drop reason) and `reports/dev_v2_linear/linear_subset_per_strain.csv`.
 
