@@ -1,0 +1,7 @@
+experiment: dev_v2_nets_molgraph_v3
+seeds: [42, 7, 123]
+representations: {peptide: [molgraph], organism: [vocab]}
+architectures:
+  - name: baseline_classifier
+    epochs: 15
+    hparams: {organism_embed_dim: 8, hidden_dims: [64, 32], batch_size: 128, weight_decay: 1.0e-4}

@@ -1,0 +1,6 @@
+experiment: dev_v2_trees_rounds_v1
+seeds: [42, 7, 123]
+representations: {peptide: [peptideclm], organism: [vocab]}
+architectures:
+  - name: xgboost_classifier
+    hparams: {n_estimators: 300, learning_rate: 0.03, max_depth: 8, min_child_weight: 1, subsample: 0.8, colsample_bytree: 0.5, reg_lambda: 5.0}
