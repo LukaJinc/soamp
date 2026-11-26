@@ -1,0 +1,14 @@
+{
+  "method": "vocab_embedding",
+  "unknown_index": 0,
+  "vocab": {
+    "Acinetobacter baumannii ATCC 19606": 1,
+    "Bacillus subtilis ATCC 6633": 2,
+    "Enterococcus faecalis ATCC 29212": 3,
+    "Escherichia coli ATCC 25922": 4,
+    "Klebsiella pneumoniae ATCC 700603": 5,
+    "Pseudomonas aeruginosa ATCC 27853": 6,
+    "Staphylococcus aureus ATCC 25923": 7
+  },
+  "vocab_size": 8
+}

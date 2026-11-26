@@ -1,0 +1,15 @@
+# Base for every generated cell on the linear-only dev v2 dataset (data/dev_v2_linear/: the dev_v2
+# pairs whose peptide has no intrachain bond and no macrocycle/disulfide, same labels and the same
+# test + 5-fold assignment as dev_v2; docs/dev_dataset_v2_linear.md). Cells written by
+# soamp.runs.plan inherit this via `_base_` and add their representation files, architecture and
+# hyperparameters.
+_base_: cv_dev_v2_base.yaml
+
+exp_id: dev_v2_linear_base
+
+paths:
+  data_dir: data/dev_v2_linear
+
+wandb_group: dev_v2_linear
+wandb_tags:
+  - dev_v2_linear_dataset

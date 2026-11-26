@@ -1,0 +1,10 @@
+# Dev v2, linear peptides only: a row filter on data/dev_v2 that keeps the peptides with no
+# intrachain bond (DBAASP) and no macrocycle or disulfide in their SMILES. Labels and split
+# assignments are the ones data/dev_v2 already has -- nothing is relabelled or re-split.
+# Run: python pipeline/data/05_build_linear_subset.py --config config/data/dev_v2_linear.yaml
+# then refit the three peptide scalers (see that script's docstring). docs/dev_dataset_v2_linear.md
+
+paths:
+  source_dir: data/dev_v2
+  out_dir: data/dev_v2_linear
+  reports_dir: reports/dev_v2_linear

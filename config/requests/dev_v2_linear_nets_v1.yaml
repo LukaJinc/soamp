@@ -1,0 +1,20 @@
+# Linear-peptides-only test, neural half: the exact attention-fusion x molecular-graph control cell
+# of dev_v2_combo_nets_v1 (50 epochs, lr 1e-3, batch 256, projection 32, 2 heads, 1 layer,
+# head [32, 16]), on the same three seeds, run on dev_v2_linear.
+experiment: dev_v2_linear_nets_v1
+dataset: dev_v2_linear
+seeds: [42, 123, 7]
+representations:
+  peptide: [molgraph]
+  organism: [vocab]
+architectures:
+  - name: attention_fusion_classifier
+    epochs: 50
+    hparams:
+      learning_rate: 1.0e-3
+      weight_decay: 0
+      batch_size: 256
+      projection_dim: 32
+      num_attention_heads: 2
+      num_attention_layers: 1
+      hidden_dims: [32, 16]

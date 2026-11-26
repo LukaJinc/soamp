@@ -233,6 +233,7 @@ data/peptide_features_peptideclm.csv
 # artifact (scripts/exp/publish_data.py), never in git.
 data/dev/peptide_features_peptideclm.csv
 data/dev_v2/peptide_features_peptideclm.csv
+data/dev_v2_linear/peptide_features_peptideclm.csv
 
 # EDA intermediates: 39MB of clustering embeddings/distance matrices, all
 # regenerable from scripts/EDA/01-05 and not an input to any pipeline stage.
