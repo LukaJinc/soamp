@@ -52,6 +52,10 @@ LOG_PATH = (
 )
 
 
+# Combined/derived methods with no precomputed feature CSV (see PEPTIDE_METHODS).
+CV_ONLY_METHODS = ("molecular_graph_pooled", "peptideclm_molgraph_pooled", "peptideclm_molgraph")
+
+
 def main() -> None:
     log = configure_logging("features.03_fit_peptide_scaler")
 
@@ -68,6 +72,21 @@ def main() -> None:
             json.dump(stub, f, indent=2)
             f.write("\n")
         log.info(f"Wrote graph stub {OUT_JSON}")
+        return
+
+    if CFG.peptide_featurization.method in CV_ONLY_METHODS:
+        # Featurized fresh per CV fold (scaler fitted on each fold's fit part),
+        # so the artifact only has to name the method for train_cv.py.
+        stub = {
+            "method": CFG.peptide_featurization.method, "cv_only": True,
+            "descriptor_names": [], "mean": [], "scale": [],
+            "fitted_on": "n/a (CV-only: featurized and scaled per fold in pipeline/train_cv.py)",
+        }
+        CFG.paths.data_dir.mkdir(parents=True, exist_ok=True)
+        with open(OUT_JSON, "w") as f:
+            json.dump(stub, f, indent=2)
+            f.write("\n")
+        log.info(f"Wrote CV-only stub {OUT_JSON}")
         return
 
     with open(CLASSIFICATION_CSV, newline="") as f:

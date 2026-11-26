@@ -47,6 +47,7 @@ from soamp.engine.cross_validation import (
     train_and_evaluate_fold,
 )
 from soamp.engine.tracking import build_tracker, count_parameters
+from soamp.features.peptide_featurizers import PEPTIDECLM_METHODS
 from soamp.engine.tree_cv import count_tree_parameters, train_and_evaluate_fold_tree
 from soamp.model.factory import build_model
 from soamp.utils.config import load_config
@@ -133,7 +134,7 @@ def main() -> None:
     # See PeptideCLMFeaturizer's docstring. A no-op for rdkit_descriptors.
     peptide_feature_cache: dict = {}
     peptide_method_kwargs = (
-        {"cache": peptide_feature_cache} if peptide_method == "peptideclm_embedding" else None
+        {"cache": peptide_feature_cache} if peptide_method in PEPTIDECLM_METHODS else None
     )
 
     # Built purely to source the real peptide/organism representation info

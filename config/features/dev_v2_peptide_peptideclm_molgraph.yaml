@@ -1,0 +1,6 @@
+# Molecular graph (trainable GNN in the model) ++ PeptideCLM embedding vector, for the dev v2 dataset (data/dev_v2/). Same method as peptide_peptideclm_molgraph.yaml; only the data dir moves.
+_base_: peptide_peptideclm_molgraph.yaml
+
+paths:
+  data_dir: data/dev_v2
+  reports_dir: reports/dev_v2

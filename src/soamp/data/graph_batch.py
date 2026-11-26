@@ -53,3 +53,27 @@ def collate_graph_batch(items: list[tuple]) -> tuple[GraphBatch, torch.Tensor, t
     (MolGraph, organism_tensor, label_tensor)."""
     graphs, organisms, labels = zip(*items)
     return batch_graphs(list(graphs)), torch.stack(organisms), torch.stack(labels)
+
+
+@dataclass
+class GraphVectorBatch:
+    """A graph batch plus a (num_graphs, D) float vector per graph (the
+    `graph_vector` peptide input: GNN-encoded graph ++ frozen embedding)."""
+
+    graphs: GraphBatch
+    vectors: torch.Tensor
+
+    def to(self, device: "torch.device | str") -> "GraphVectorBatch":
+        return GraphVectorBatch(graphs=self.graphs.to(device), vectors=self.vectors.to(device))
+
+
+def collate_graph_vector_batch(items: list[tuple]) -> tuple[GraphVectorBatch, torch.Tensor, torch.Tensor]:
+    """DataLoader collate for graph_vector mode: items are
+    ((MolGraph, vector_tensor), organism_tensor, label_tensor)."""
+    peptides, organisms, labels = zip(*items)
+    graphs, vectors = zip(*peptides)
+    return (
+        GraphVectorBatch(graphs=batch_graphs(list(graphs)), vectors=torch.stack(vectors)),
+        torch.stack(organisms),
+        torch.stack(labels),
+    )

@@ -1,0 +1,14 @@
+# Richer peptide inputs, neural half (3 seeds). Attention fusion at its best dev_v2 setting
+# (50 epochs, projection 32, 2 heads, 1 layer, head [32, 16]):
+#   molgraph                  -> control (trainable GNN only)
+#   peptideclm_molgraph       -> trainable GNN output ++ frozen PeptideCLM embedding
+#   peptideclm_molgraph_pool  -> PeptideCLM ++ pooled graph vector (same input as the tree half)
+experiment: dev_v2_combo_nets_v1
+seeds: [42, 7, 123]
+representations:
+  peptide: [molgraph, peptideclm_molgraph, peptideclm_molgraph_pool]
+  organism: [vocab]
+architectures:
+  - name: attention_fusion_classifier
+    epochs: 50
+    hparams: {projection_dim: 32, num_attention_heads: 2, num_attention_layers: 1, hidden_dims: [32, 16]}

@@ -1,0 +1,6 @@
+# PeptideCLM embedding (768) ++ pooled molecular-graph vector (151), for the dev v2 dataset (data/dev_v2/). Same method as peptide_peptideclm_molgraph_pool.yaml; only the data dir moves.
+_base_: peptide_peptideclm_molgraph_pool.yaml
+
+paths:
+  data_dir: data/dev_v2
+  reports_dir: reports/dev_v2

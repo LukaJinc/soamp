@@ -1,0 +1,8 @@
+{
+  "method": "molecular_graph_pooled",
+  "cv_only": true,
+  "descriptor_names": [],
+  "mean": [],
+  "scale": [],
+  "fitted_on": "n/a (CV-only: featurized and scaled per fold in pipeline/train_cv.py)"
+}

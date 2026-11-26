@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import torch
 from torch.utils.data import Dataset
 
-from soamp.data.graph_batch import collate_graph_batch
+from soamp.data.graph_batch import collate_graph_batch, collate_graph_vector_batch
 from soamp.features.scaling import apply_scaler
 
 if TYPE_CHECKING:
@@ -50,10 +50,15 @@ class PeptideOrganismDataset(Dataset):
         # collate_graph_batch) instead of a scaled descriptor vector; pass
         # empty peptide_features / descriptor_names / scaler in that case.
         self.peptide_graphs = peptide_graphs
+        # Graph + vector mode (e.g. GNN ++ PeptideCLM): graphs AND named
+        # features are given; an item's peptide side is (MolGraph, vector).
+        self.graph_vector = peptide_graphs is not None and bool(descriptor_names)
 
     @property
     def collate_fn(self):
         """None (torch's default collate) for vector peptide input."""
+        if self.graph_vector:
+            return collate_graph_vector_batch
         return collate_graph_batch if self.peptide_graphs is not None else None
 
     def __len__(self) -> int:
@@ -68,7 +73,12 @@ class PeptideOrganismDataset(Dataset):
                 raise PeptideOrganismDatasetError(
                     f"peptide_id {pid!r} has no entry in peptide_graphs"
                 )
-            return graph, *self._organism_and_label(row)
+            if not self.graph_vector:
+                return graph, *self._organism_and_label(row)
+            return (graph, self._scaled_vector(pid)), *self._organism_and_label(row)
+        return (self._scaled_vector(pid), *self._organism_and_label(row))
+
+    def _scaled_vector(self, pid: str) -> torch.Tensor:
         features = self.peptide_features.get(pid)
         if features is None:
             raise PeptideOrganismDatasetError(
@@ -76,8 +86,7 @@ class PeptideOrganismDataset(Dataset):
             )
         raw_values = [features[name] for name in self.descriptor_names]
         scaled_values = apply_scaler(raw_values, self.scaler_mean, self.scaler_scale)
-
-        return (torch.tensor(scaled_values, dtype=torch.float32), *self._organism_and_label(row))
+        return torch.tensor(scaled_values, dtype=torch.float32)
 
     def _organism_and_label(self, row: dict) -> tuple[torch.Tensor, torch.Tensor]:
         organism_value = self.organism_featurizer.encode(row["organism"])

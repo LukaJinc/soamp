@@ -1,0 +1,12 @@
+# Pooled molecular-graph vector (151 counts/fractions: atoms, bonds, element pairs).
+# CV-only: featurized fresh per fold by pipeline/train_cv.py, so
+# 03_fit_peptide_scaler.py writes only a self-describing method stub and
+# 01_build_peptide_features.py is never run for it.
+_base_: base.yaml
+
+peptide_featurization:
+  method: molecular_graph_pooled
+
+output_files:
+  peptide_features_filename: peptide_features_molgraph_pool.csv   # never written
+  peptide_feature_scaler_filename: peptide_feature_scaler_molgraph_pool.json

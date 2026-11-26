@@ -71,6 +71,12 @@ DATASETS: dict[str, dict] = {
             "rdkit": ("peptide_features_rdkit.csv", "peptide_feature_scaler_rdkit.json", "rdkit_descriptors"),
             "peptideclm": ("peptide_features_peptideclm.csv", "peptide_feature_scaler_peptideclm.json", "peptideclm_embedding"),
             "molgraph": ("peptide_features_molgraph.csv", "peptide_feature_scaler_molgraph.json", "molecular_graph"),
+            # CV-only combined inputs (featurized per fold; only a method stub is written):
+            # pooled molgraph vector (trees can use it), PeptideCLM ++ pooled molgraph vector,
+            # and PeptideCLM vector ++ trainable GNN (neural models only).
+            "molgraph_pool": ("peptide_features_molgraph_pool.csv", "peptide_feature_scaler_molgraph_pool.json", "molecular_graph_pooled"),
+            "peptideclm_molgraph_pool": ("peptide_features_peptideclm_molgraph_pool.csv", "peptide_feature_scaler_peptideclm_molgraph_pool.json", "peptideclm_molgraph_pooled"),
+            "peptideclm_molgraph": ("peptide_features_peptideclm_molgraph.csv", "peptide_feature_scaler_peptideclm_molgraph.json", "peptideclm_molgraph"),
         },
         "organism": {
             "vocab": ("organism_vocab_vocab_embedding.json", "vocab_embedding"),
@@ -89,6 +95,15 @@ DATASETS: dict[str, dict] = {
                 "molgraph": [
                     (["python", "pipeline/features/03_fit_peptide_scaler.py", "--config", "config/features/dev_v2_peptide_molgraph.yaml"], ["data/dev_v2/peptide_feature_scaler_molgraph.json"]),
                 ],
+                "molgraph_pool": [
+                    (["python", "pipeline/features/03_fit_peptide_scaler.py", "--config", "config/features/dev_v2_peptide_molgraph_pool.yaml"], ["data/dev_v2/peptide_feature_scaler_molgraph_pool.json"]),
+                ],
+                "peptideclm_molgraph_pool": [
+                    (["python", "pipeline/features/03_fit_peptide_scaler.py", "--config", "config/features/dev_v2_peptide_peptideclm_molgraph_pool.yaml"], ["data/dev_v2/peptide_feature_scaler_peptideclm_molgraph_pool.json"]),
+                ],
+                "peptideclm_molgraph": [
+                    (["python", "pipeline/features/03_fit_peptide_scaler.py", "--config", "config/features/dev_v2_peptide_peptideclm_molgraph.yaml"], ["data/dev_v2/peptide_feature_scaler_peptideclm_molgraph.json"]),
+                ],
             },
             "organism": {
                 "vocab": [
@@ -98,6 +113,9 @@ DATASETS: dict[str, dict] = {
         },
     },
 }
+
+# Peptide representations that feed a trainable GNN (not usable by vector_only models).
+GRAPH_PEPTIDE_REPRESENTATIONS = frozenset({"molgraph", "peptideclm_molgraph"})
 
 DEFAULT_DATASET = "dev_v2"   # a request that names no dataset means the seven-strain data
 
@@ -318,10 +336,11 @@ class ExperimentRequest(BaseModel):
                 raise ValueError(f"organism representation {o!r} not available for dataset {self.dataset!r}; have {sorted(ds['organism'])}")
         if not self.architectures:
             raise ValueError("at least one architecture is required")
-        if "molgraph" in self.representations.peptide:
+        graph_reps = [p for p in self.representations.peptide if p in GRAPH_PEPTIDE_REPRESENTATIONS]
+        if graph_reps:
             bad = [a.name for a in self.architectures if ARCHITECTURES[a.name].vector_only]
             if bad:
-                raise ValueError(f"architecture(s) {bad} need a vector peptide representation, not molgraph")
+                raise ValueError(f"architecture(s) {bad} need a vector peptide representation, not {graph_reps}")
         if not self.seeds:
             raise ValueError("at least one seed is required")
         return self

@@ -65,7 +65,11 @@ class MolecularGraphConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-PEPTIDE_METHODS = ("rdkit_descriptors", "peptideclm_embedding", "molecular_graph")
+PEPTIDE_METHODS = (
+    "rdkit_descriptors", "peptideclm_embedding", "molecular_graph",
+    # CV-only (featurized per fold; 03_fit_peptide_scaler.py writes a stub):
+    "molecular_graph_pooled", "peptideclm_molgraph_pooled", "peptideclm_molgraph",
+)
 
 
 class PeptideFeaturizationConfig(BaseModel):
@@ -75,6 +79,9 @@ class PeptideFeaturizationConfig(BaseModel):
     rdkit_descriptors: RDKitDescriptorsConfig = RDKitDescriptorsConfig()
     peptideclm_embedding: PeptideCLMConfig = PeptideCLMConfig()
     molecular_graph: MolecularGraphConfig = MolecularGraphConfig()
+    molecular_graph_pooled: MolecularGraphConfig = MolecularGraphConfig()
+    peptideclm_molgraph_pooled: PeptideCLMConfig = PeptideCLMConfig()
+    peptideclm_molgraph: PeptideCLMConfig = PeptideCLMConfig()
 
     @model_validator(mode="after")
     def _method_must_be_known(self) -> "PeptideFeaturizationConfig":

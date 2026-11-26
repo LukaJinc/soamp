@@ -69,7 +69,7 @@ class Featurization:
     organism_feature_dim: int | None = None
     peptide_method: str = DEFAULT_PEPTIDE_METHOD
     organism_method: str = DEFAULT_ORGANISM_METHOD
-    peptide_input_kind: Literal["vector", "graph"] = "vector"
+    peptide_input_kind: Literal["vector", "graph", "graph_vector"] = "vector"
     graph_node_dim: int | None = None
     graph_edge_dim: int | None = None
 
@@ -198,6 +198,11 @@ def _build_dataset_from_artifacts(
     with open(resolved_data_dir / val_split_filename) as f:
         val_split = json.load(f)
 
+    if scaler.get("cv_only"):
+        raise DatasetFactoryError(
+            f"peptide method {scaler.get('method')!r} is CV-only (featurized per fold); "
+            "artifact mode (row_groups=None) has no precomputed features for it"
+        )
     peptide_graphs = None
     if scaler.get("method") == "molecular_graph":
         # Graph input has no feature CSV / fitted scaler: graphs are a fixed
@@ -276,13 +281,16 @@ def _build_dataset_from_rows(
 
     peptide_featurizer.fit(fit_unique_peptides)
     feature_rows = peptide_featurizer.transform(unique_peptides)
-    is_graph = peptide_featurizer.input_kind == "graph"
+    input_kind = peptide_featurizer.input_kind
+    is_graph = input_kind == "graph"
     descriptor_names = peptide_featurizer.feature_names
+    peptide_graphs = (
+        {row["peptide_id"]: row["graph"] for row in feature_rows}
+        if input_kind in ("graph", "graph_vector") else None
+    )
     if is_graph:
         peptide_features, scaler = {}, {**GRAPH_SCALER_STUB, "method": "molecular_graph"}
-        peptide_graphs = {row["peptide_id"]: row["graph"] for row in feature_rows}
     else:
-        peptide_graphs = None
         peptide_features = index_feature_rows_by_peptide_id(feature_rows, descriptor_names)
         fit_feature_rows = [row for row in feature_rows if row["peptide_id"] in fit_peptide_ids]
         scaler = fit_scaler(fit_feature_rows, descriptor_names)
@@ -308,6 +316,10 @@ def _build_dataset_from_rows(
             peptide_method=peptide_method,
             organism_method=organism_method,
         )
+        if input_kind == "graph_vector":
+            featurization.peptide_input_kind = "graph_vector"
+            featurization.graph_node_dim = GRAPH_NODE_DIM
+            featurization.graph_edge_dim = GRAPH_EDGE_DIM
 
     datasets = {
         name: _dataset_from_featurization(
