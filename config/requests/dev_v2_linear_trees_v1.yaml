@@ -1,0 +1,21 @@
+# Linear-peptides-only test, tree half: the exact XGBoost x PeptideCLM control cell of
+# dev_v2_combo_trees_v1 (lr 0.03, depth 8, 600 rounds, subsample 0.8, colsample 0.5, lambda 5),
+# on the same three seeds, run on dev_v2_linear. Compare cell-for-cell against that group.
+experiment: dev_v2_linear_trees_v1
+dataset: dev_v2_linear
+seeds: [42, 123, 7]
+representations:
+  peptide: [peptideclm]
+  organism: [vocab]
+architectures:
+  - name: xgboost_classifier
+    hparams:
+      n_estimators: 600
+      learning_rate: 0.03
+      max_depth: 8
+      min_child_weight: 1
+      reg_lambda: 5
+      reg_alpha: 0
+      gamma: 0
+      subsample: 0.8
+      colsample_bytree: 0.5
