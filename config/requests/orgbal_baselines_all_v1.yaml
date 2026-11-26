@@ -1,0 +1,20 @@
+# Baseline ladder on the per-organism-balanced dev_v2 split (config/data/dev_v2_orgbal.yaml), ALL peptides.
+# 3 models x 8 organism variants (7 strains one by one + all strains pooled) = 24 cells, RDKit descriptors + one-hot
+# strain, 5-fold CV only, no class weighting. XGBoost = the repo defaults (XGBoostClassifierConfig), written out.
+# The twin request orgbal_baselines_linear_v1.yaml runs the other population.
+experiment: orgbal_baselines_all_v1
+dataset: dev_v2_orgbal
+seeds: [42]
+representations:
+  peptide: [rdkit]
+  organism: [vocab]          # vocab_embedding: one-hot strain block next to the 13 descriptors
+class_balancing: none
+organism_subsets: [all, each]
+snapshot_every_n_epochs: 10
+architectures:
+  - name: logistic_regression_classifier
+    hparams: {C: 1.0, max_iter: 1000}
+  - name: decision_tree_classifier      # scikit-learn defaults: fully grown tree
+    hparams: {min_samples_split: 2, min_samples_leaf: 1}
+  - name: xgboost_classifier
+    hparams: {n_estimators: 300, learning_rate: 0.1, max_depth: 6}

@@ -1,0 +1,20 @@
+# Dev v2 data with a per-organism-balanced split: same seven strains, same labels, same clusters as
+# config/data/dev_v2.yaml; only the assignment of whole clusters to test + 5 folds changes. On top of
+# size / non-linear share / overall active share it balances, per organism, the active rate of the
+# labelled pairs (lambda_organism_active) and of the linear pairs only (lambda_organism_active_linear),
+# so a linear-only subset of this split stays balanced per organism. Weights chosen by a grid over
+# {0,5,15,30} x {0,5,15}, three seeds: both 15 -> worst per-organism deviation <= 0.4 points (full and
+# linear) vs 10-25 points without, bucket size within 0.1 point of target.
+# Run: python pipeline/data/03_build_dev_classification_dataset.py --config config/data/dev_v2_orgbal.yaml
+# Writes only under data/dev_v2_orgbal/ and reports/dev_v2_orgbal/; data/dev_v2/ is untouched.
+_base_: dev_v2.yaml
+
+paths:
+  split_parquet: data/dev_v2_orgbal/dbaasp_dev_split_final.parquet   # OUTPUT here
+  out_dir: data/dev_v2_orgbal
+  reports_dir: reports/dev_v2_orgbal
+
+bucketing:
+  lambda_organism_active: 15.0
+  lambda_organism_active_linear: 15.0
+  n_iterations: 300000

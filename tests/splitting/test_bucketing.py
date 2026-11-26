@@ -214,3 +214,51 @@ def test_stratified_split_rejects_active_without_rows_or_exceeding_rows():
         stratified_cluster_split(
             nc, ["a", "b"], [False, False], row_counts=[1, 1], active_counts=[2, 0]
         )
+
+
+def _group_inputs(n=60, seed=0):
+    rng = np.random.default_rng(seed)
+    node_communities = pd.DataFrame({"node_id": range(n), "community": [i // 2 for i in range(n)]})
+    ids = [str(i) for i in range(n)]
+    rows = [int(r) for r in rng.integers(1, 4, size=n)]
+    act = [int(rng.integers(0, r + 1)) for r in rows]
+    return node_communities, ids, rows, act
+
+
+def test_group_terms_are_inert_at_zero_weight_and_deterministic():
+    from soamp.splitting.bucketing import PeptideGroup
+    nc, ids, rows, act = _group_inputs()
+    kw = dict(row_counts=rows, active_counts=act, n_iterations=2000, seed=3)
+    plain = stratified_cluster_split(nc, ids, [False] * len(ids), **kw)
+    zero = stratified_cluster_split(nc, ids, [False] * len(ids), groups=[PeptideGroup("g", 0.0, rows, act)], **kw)
+    again = stratified_cluster_split(nc, ids, [False] * len(ids), groups=[PeptideGroup("g", 0.0, rows, act)], **kw)
+    assert plain.split_by_peptide_id == zero.split_by_peptide_id == again.split_by_peptide_id
+    assert plain.fold_by_peptide_id == zero.fold_by_peptide_id
+
+
+def test_group_balance_reports_stats_and_validates_inputs():
+    from soamp.splitting.bucketing import PeptideGroup
+    nc, ids, rows, act = _group_inputs()
+    g = PeptideGroup("only_even", 10.0, [r if i % 2 == 0 else 0 for i, r in enumerate(rows)],
+                     [a if i % 2 == 0 else 0 for i, a in enumerate(act)])
+    result = stratified_cluster_split(nc, ids, [False] * len(ids), row_counts=rows, active_counts=act,
+                                      groups=[g], n_iterations=2000)
+    assert sum(s["group_rows[only_even]"] for s in result.bucket_stats.values()) == sum(g.row_counts)
+    with pytest.raises(BucketingError):   # wrong length
+        stratified_cluster_split(nc, ids, [False] * len(ids), row_counts=rows, active_counts=act,
+                                 groups=[PeptideGroup("bad", 1.0, rows[:-1], act[:-1])])
+    with pytest.raises(BucketingError):   # negative weight
+        stratified_cluster_split(nc, ids, [False] * len(ids), row_counts=rows, active_counts=act,
+                                 groups=[PeptideGroup("neg", -1.0, rows, act)])
+    with pytest.raises(BucketingError):   # active > rows
+        stratified_cluster_split(nc, ids, [False] * len(ids), row_counts=rows, active_counts=act,
+                                 groups=[PeptideGroup("over", 1.0, rows, [r + 1 for r in rows])])
+
+
+def test_group_with_no_rows_in_a_bucket_is_skipped_not_nan():
+    from soamp.splitting.bucketing import ClusterGroup
+    sizes = {0: 10, 1: 10, 2: 10, 3: 10}
+    ncs = {c: 0 for c in sizes}
+    g = ClusterGroup("rare", 5.0, {0: 3, 1: 0, 2: 0, 3: 0}, {0: 1, 1: 0, 2: 0, 3: 0})
+    result = assign_clusters_to_buckets(sizes, ncs, {"test": 0.5, "train": 0.5}, groups=[g], n_iterations=500)
+    assert set(result) == set(sizes)

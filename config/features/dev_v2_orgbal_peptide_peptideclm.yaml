@@ -1,0 +1,7 @@
+# PeptideCLM embeddings (768-d) for the dev v2 dataset (data/dev_v2_orgbal/: seven strains, MIC recomputed from
+# concentration). Same method as peptide_peptideclm.yaml; only the data dir moves.
+_base_: peptide_peptideclm.yaml
+
+paths:
+  data_dir: data/dev_v2_orgbal
+  reports_dir: reports/dev_v2_orgbal   # keep dev v2 logs apart from the older runs

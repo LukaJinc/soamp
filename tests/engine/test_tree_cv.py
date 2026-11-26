@@ -102,3 +102,47 @@ def test_config_registers_the_tree_architecture_and_counts_parameters():
     assert count_tree_parameters(m.active_kwargs()) == 200 * 31
     with pytest.raises(ValueError):
         ModelConfig(architecture="resnet")
+
+
+# ---- single-fit baselines: logistic regression / decision tree ----------------------------------
+
+LR_PARAMS = {"C": 1.0, "max_iter": 500}
+DT_PARAMS = {"max_depth": None, "min_samples_split": 2, "min_samples_leaf": 1}
+
+
+@pytest.mark.parametrize("architecture,params", [("logistic_regression_classifier", LR_PARAMS), ("decision_tree_classifier", DT_PARAMS)])
+def test_single_fit_baselines_share_the_contract_with_one_round(architecture, params):
+    entries, snaps = [], []
+    _, (metrics, results) = _fold(params=params, architecture=architecture, on_epoch_end=entries.append,
+                                  snapshot_every_n_epochs=10, on_snapshot=snaps.append, class_balancing_mode="none")
+    assert set(metrics) == {"fit", "val"}
+    assert [e["epoch"] for e in entries] == [1] and [s["epoch"] for s in snaps] == [1]
+    assert np.isfinite([entries[0]["fit_loss"], entries[0]["val_loss"]]).all()
+    assert np.isfinite(results["logit"]).all() and np.all((results["prob"] > 0) & (results["prob"] < 1))
+    assert results["eval_group"].value_counts().to_dict() == {"fit": 40, "val": 20}
+
+
+def test_fully_grown_decision_tree_memorises_with_finite_clipped_logits():
+    from soamp.engine.tree_cv import fit_tree
+
+    rng = np.random.default_rng(0)
+    x, y = rng.normal(size=(80, 5)), rng.integers(0, 2, 80)      # distinct rows, random labels: only memorising fits them
+    model = fit_tree("decision_tree_classifier", DT_PARAMS, x, y, None, 0, {"fit": x})
+    z = model.logits("fit")
+    assert np.all(np.isfinite(z)) and np.array_equal((z > 0).astype(int), y)   # pure leaves would be +-inf unclipped
+    assert np.isfinite(weighted_bce_from_logits(z, y, None))
+    assert model.n_rounds == 1 and len(list(model.staged_logits("fit"))) == 1
+
+
+def test_baseline_parameter_counts():
+    assert count_tree_parameters(LR_PARAMS, "logistic_regression_classifier", n_features=20) == 21
+    assert count_tree_parameters({"max_depth": 4}, "decision_tree_classifier") == 16
+    assert count_tree_parameters(DT_PARAMS, "decision_tree_classifier", n_fit_rows=100) == 100
+    with pytest.raises(TreeModelError):
+        count_tree_parameters(LR_PARAMS, "logistic_regression_classifier")
+
+
+def test_new_architectures_are_registered_with_their_own_defaults():
+    assert {"logistic_regression_classifier", "decision_tree_classifier"} <= TREE_ARCHITECTURES
+    assert ModelConfig(architecture="logistic_regression_classifier").active_kwargs() == {"C": 1.0, "max_iter": 1000}
+    assert ModelConfig(architecture="decision_tree_classifier").active_kwargs()["max_depth"] is None

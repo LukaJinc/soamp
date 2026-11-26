@@ -99,6 +99,54 @@ DATASETS: dict[str, dict] = {
     },
 }
 
+
+# The seven target strains of the dev_v2 family (config/data/dev_v2.yaml `target_organisms`), as they appear in the
+# `organism` column of every dev_v2* mic_classification_dataset.csv. `organism_subsets: [each]` expands over them.
+DEV_V2_ORGANISMS = (
+    "Escherichia coli ATCC 25922",
+    "Staphylococcus aureus ATCC 25923",
+    "Pseudomonas aeruginosa ATCC 27853",
+    "Acinetobacter baumannii ATCC 19606",
+    "Klebsiella pneumoniae ATCC 700603",
+    "Enterococcus faecalis ATCC 29212",
+    "Bacillus subtilis ATCC 6633",
+)
+
+
+def _dev_v2_variant(name: str, base_config: str) -> dict:
+    """Entry for a dataset directory that holds the dev_v2 file set under ``data/<name>/`` (RDKit, PeptideCLM and
+    molecular-graph peptide files, 7-strain vocab) with feature overlays ``config/features/<name>_*.yaml``."""
+    d = f"data/{name}"
+    peptide = {"rdkit": ("peptide_features_rdkit.csv", "peptide_feature_scaler_rdkit.json", "rdkit_descriptors"),
+               "peptideclm": ("peptide_features_peptideclm.csv", "peptide_feature_scaler_peptideclm.json", "peptideclm_embedding"),
+               "molgraph": ("peptide_features_molgraph.csv", "peptide_feature_scaler_molgraph.json", "molecular_graph")}
+    cfg = lambda m: f"config/features/{name}_{m}.yaml"  # noqa: E731
+    py = lambda script, c, out: (["python", f"pipeline/features/{script}", "--config", c], [out])  # noqa: E731
+    return {
+        "base_config": base_config,
+        "organisms": list(DEV_V2_ORGANISMS),
+        "peptide": peptide,
+        "organism": {"vocab": ("organism_vocab_vocab_embedding.json", "vocab_embedding")},
+        "required_artifacts": [f"{d}/mic_classification_dataset.csv", f"{d}/peptide_split.csv"],
+        "prepare": {
+            "peptide": {
+                "rdkit": [py("01_build_peptide_features.py", cfg("peptide_rdkit"), f"{d}/peptide_features_rdkit.csv"),
+                          py("03_fit_peptide_scaler.py", cfg("peptide_rdkit"), f"{d}/peptide_feature_scaler_rdkit.json")],
+                "peptideclm": [py("01_build_peptide_features.py", cfg("peptide_peptideclm"), f"{d}/peptide_features_peptideclm.csv"),
+                               py("03_fit_peptide_scaler.py", cfg("peptide_peptideclm"), f"{d}/peptide_feature_scaler_peptideclm.json")],
+                "molgraph": [py("03_fit_peptide_scaler.py", cfg("peptide_molgraph"), f"{d}/peptide_feature_scaler_molgraph.json")],
+            },
+            "organism": {"vocab": [py("02_build_organism_vocab.py", cfg("organism_vocab"), f"{d}/organism_vocab_vocab_embedding.json")]},
+        },
+    }
+
+
+# dev_v2 pairs and labels with the test + 5 folds re-assigned so every organism's active share is balanced
+# across buckets (config/data/dev_v2_orgbal.yaml), and its linear-only row filter (same split; the filter
+# rule is soamp.data.linear_subset). Not comparable with dev_v2 results: the split differs.
+DATASETS["dev_v2_orgbal"] = _dev_v2_variant("dev_v2_orgbal", "cv_dev_v2_orgbal_base.yaml")
+DATASETS["dev_v2_orgbal_linear"] = _dev_v2_variant("dev_v2_orgbal_linear", "cv_dev_v2_orgbal_linear_base.yaml")
+
 DEFAULT_DATASET = "dev_v2"   # a request that names no dataset means the seven-strain data
 
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]{2,48}$")
@@ -183,6 +231,21 @@ class XGBoostHParams(_HParams):
     colsample_bytree: float | list[float] | None = None
 
 
+class LogisticRegressionHParams(_HParams):
+    """scikit-learn logistic regression (L2), a single fit: no epochs or rounds."""
+
+    C: float | list[float] | None = None
+    max_iter: int | list[int] | None = None
+
+
+class DecisionTreeHParams(_HParams):
+    """scikit-learn decision tree, a single fit: no epochs or rounds. `max_depth` left out = fully grown."""
+
+    max_depth: int | list[int] | None = None
+    min_samples_split: int | list[int] | None = None
+    min_samples_leaf: int | list[int] | None = None
+
+
 @dataclass(frozen=True)
 class ArchSpec:
     tag: str  # short name used in run names
@@ -197,6 +260,8 @@ ARCHITECTURES: dict[str, ArchSpec] = {
     "attention_fusion_classifier": ArchSpec("attn", AttentionFusionHParams),
     "hist_gradient_boosting_classifier": ArchSpec("hgb", HistGradientBoostingHParams, uses_common=False, vector_only=True, rounds_param="max_iter"),
     "xgboost_classifier": ArchSpec("xgb", XGBoostHParams, uses_common=False, vector_only=True, rounds_param="n_estimators"),
+    "logistic_regression_classifier": ArchSpec("lr", LogisticRegressionHParams, uses_common=False, vector_only=True),
+    "decision_tree_classifier": ArchSpec("dt", DecisionTreeHParams, uses_common=False, vector_only=True),
 }
 COMMON_FIELDS = tuple(CommonHParams.model_fields)
 
@@ -229,7 +294,8 @@ class ArchitectureRequest(BaseModel):
     def _validate_hparams(self) -> "ArchitectureRequest":
         spec = ARCHITECTURES[self.name]
         if not spec.uses_common and self.epochs is not None:
-            raise ValueError(f"architecture {self.name!r} has no epochs; set hparams.{spec.rounds_param} (boosting rounds) instead")
+            hint = f"; set hparams.{spec.rounds_param} (boosting rounds) instead" if spec.rounds_param else " or rounds (a single fit)"
+            raise ValueError(f"architecture {self.name!r} has no epochs{hint}")
         common, specific = self._split()
         # extra="forbid" on both models turns a foreign/typo'd key into an error that
         # names the architecture, instead of silently dropping it.
@@ -277,6 +343,11 @@ class ExperimentRequest(BaseModel):
     representations: Representations
     architectures: list[ArchitectureRequest]
     sampling: Sampling = Sampling()
+    # "auto" = the repo default (positives re-weighted by the class ratio); "none" = plain unweighted fits.
+    class_balancing: Literal["auto", "none"] = "auto"
+    # Which rows each cell trains on: "all" = every organism pooled, "each" = one cell per strain of the dataset,
+    # or exact strain names. Folds are the dataset's own, so a per-strain cell is comparable with the pooled one.
+    organism_subsets: list[str] = ["all"]
     snapshot_every_n_epochs: int | None = 2
     # vast.ai GPU. Default = the class every earlier successful vast run used (config/vast/dev_*.yaml);
     # a consumer RTX 4090 host answered 403 on api.wandb.ai (2026-11-22), so cheaper cards are opt-in.
@@ -324,4 +395,21 @@ class ExperimentRequest(BaseModel):
                 raise ValueError(f"architecture(s) {bad} need a vector peptide representation, not molgraph")
         if not self.seeds:
             raise ValueError("at least one seed is required")
+        known = ds.get("organisms", [])
+        for sub in self.organism_subsets:
+            if sub not in ("all", "each") and sub not in known:
+                raise ValueError(f"organism subset {sub!r} not available for dataset {self.dataset!r}; use 'all', 'each' or one of {known}")
+        if len(set(self.organism_subsets)) != len(self.organism_subsets) or not self.organism_subsets:
+            raise ValueError("organism_subsets must be a non-empty list without repeats")
+        if "each" in self.organism_subsets and not known:
+            raise ValueError(f"dataset {self.dataset!r} has no organism list, so 'each' cannot be expanded")
         return self
+
+    def organism_filters(self) -> list[str | None]:
+        """The organism each cell is restricted to, in a stable order: None = all strains pooled."""
+        out: list[str | None] = []
+        for sub in self.organism_subsets:
+            for o in (DATASETS[self.dataset]["organisms"] if sub == "each" else [None if sub == "all" else sub]):
+                if o not in out:
+                    out.append(o)
+        return out

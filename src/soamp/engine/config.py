@@ -92,8 +92,32 @@ class XGBoostClassifierConfig(BaseModel):
     colsample_bytree: float = Field(default=1.0, gt=0, le=1.0)
 
 
+class LogisticRegressionClassifierConfig(BaseModel):
+    """scikit-learn LogisticRegression (L2) on the scaled peptide vector ++ organism one-hot: the linear
+    baseline for "is there signal in the inputs at all". A single fit = one 'round' in the logged curves."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    C: float = Field(default=1.0, gt=0)
+    max_iter: int = Field(default=1000, ge=1)
+
+
+class DecisionTreeClassifierConfig(BaseModel):
+    """scikit-learn DecisionTreeClassifier. The defaults are scikit-learn's own: a fully grown tree
+    (``max_depth=None``), i.e. a deliberately high-variance baseline. A single fit = one 'round'."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    max_depth: int | None = Field(default=None, ge=1)
+    min_samples_split: int = Field(default=2, ge=2)
+    min_samples_leaf: int = Field(default=1, ge=1)
+
+
 # Architectures trained by soamp.engine.tree_cv instead of the torch Trainer.
-TREE_ARCHITECTURES = frozenset({"hist_gradient_boosting_classifier", "xgboost_classifier"})
+TREE_ARCHITECTURES = frozenset({
+    "hist_gradient_boosting_classifier", "xgboost_classifier",
+    "logistic_regression_classifier", "decision_tree_classifier",
+})
 KNOWN_ARCHITECTURES = ("baseline_classifier", "attention_fusion_classifier", *sorted(TREE_ARCHITECTURES))
 
 
@@ -106,6 +130,8 @@ class ModelConfig(BaseModel):
     attention_fusion_classifier: AttentionFusionClassifierConfig = AttentionFusionClassifierConfig()
     hist_gradient_boosting_classifier: HistGradientBoostingClassifierConfig = HistGradientBoostingClassifierConfig()
     xgboost_classifier: XGBoostClassifierConfig = XGBoostClassifierConfig()
+    logistic_regression_classifier: LogisticRegressionClassifierConfig = LogisticRegressionClassifierConfig()
+    decision_tree_classifier: DecisionTreeClassifierConfig = DecisionTreeClassifierConfig()
 
     @model_validator(mode="after")
     def _architecture_must_be_known(self) -> "ModelConfig":
@@ -204,6 +230,15 @@ class CVConfig(BaseModel):
         return v
 
 
+class DataFilterConfig(BaseModel):
+    """Restricts the rows a CV run trains and validates on (pipeline/train_cv.py only). The peptide folds
+    are untouched, so a filtered run is comparable with the unfiltered one fold by fold."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    organism: str | None = None   # keep only this strain's rows (exact `organism` column value); None = all
+
+
 class TrainConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -218,6 +253,7 @@ class TrainConfig(BaseModel):
     # Only read by pipeline/train_cv.py -- pipeline/train.py (the single
     # held-out-split run) never touches this.
     cv: CVConfig = CVConfig()
+    data_filter: DataFilterConfig = DataFilterConfig()
     # Forwarded to wandb.init via build_tracker's **wandb_init_kwargs, so a
     # set of related runs (e.g. one featurization grid) is grouped/filterable
     # in the UI without any tracking-layer change.

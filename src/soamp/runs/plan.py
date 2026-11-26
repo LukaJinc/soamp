@@ -69,7 +69,16 @@ def _arch_combos(a: ArchitectureRequest) -> list[dict]:
     return _combos(axes)
 
 
-def _cell_body(req: ExperimentRequest, arch: str, combo: dict, pep: str, org: str, seed: int, rhash: str) -> dict:
+def organism_slug(organism: str | None) -> str:
+    """'all' for the pooled cells, else 'e_coli' for 'Escherichia coli ATCC 25922'."""
+    if organism is None:
+        return "all"
+    genus, species = organism.split()[:2]
+    return f"{genus[0]}_{species}".lower()
+
+
+def _cell_body(req: ExperimentRequest, arch: str, combo: dict, pep: str, org: str, seed: int, rhash: str,
+               organism_filter: str | None = None) -> dict:
     ds = DATASETS[req.dataset]
     feat, scaler, pep_method = ds["peptide"][pep]
     vocab, org_method = ds["organism"][org]
@@ -85,8 +94,13 @@ def _cell_body(req: ExperimentRequest, arch: str, combo: dict, pep: str, org: st
         "loop": {"seed": seed},
         "cv": {"snapshot_every_n_epochs": req.snapshot_every_n_epochs},
         "wandb_group": req.experiment,
-        "wandb_tags": [f"{req.dataset}_dataset", pep_method, org_method, arch, "cv", f"req_{rhash}"],
+        "wandb_tags": [f"{req.dataset}_dataset", pep_method, org_method, arch, "cv", f"req_{rhash}",
+                       f"organism_{organism_slug(organism_filter)}"],
     }
+    if req.class_balancing != "auto":
+        body["class_balancing"] = {"mode": req.class_balancing}
+    if organism_filter is not None:
+        body["data_filter"] = {"organism": organism_filter}
     optim = {k: combo[k] for k in ("learning_rate", "weight_decay") if k in combo and spec.uses_common}
     if optim:
         body["optim"] = optim
@@ -102,11 +116,11 @@ def expand(req: ExperimentRequest) -> list[Cell]:
     cells: dict[str, Cell] = {}
     for a in req.architectures:
         tag = ARCHITECTURES[a.name].tag
-        for combo, pep, org, seed in product(
-            _arch_combos(a), req.representations.peptide, req.representations.organism, req.seeds
+        for combo, pep, org, seed, subset in product(
+            _arch_combos(a), req.representations.peptide, req.representations.organism, req.seeds, req.organism_filters()
         ):
-            body = _cell_body(req, a.name, combo, pep, org, seed, rhash)
-            exp_id = f"{req.experiment}__{tag}__{pep}_{org}__{_sha(body)[:6]}"
+            body = _cell_body(req, a.name, combo, pep, org, seed, rhash, subset)
+            exp_id = f"{req.experiment}__{tag}__{pep}_{org}__{organism_slug(subset)}__{_sha(body)[:6]}"
             cells.setdefault(
                 exp_id,
                 Cell(exp_id, a.name, pep, org, seed, combo.get("epochs"), {"exp_id": exp_id, **body}),

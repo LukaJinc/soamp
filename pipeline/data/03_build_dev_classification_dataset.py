@@ -76,8 +76,10 @@ def main() -> None:
         per_org = (dataset.assign(active=dataset["label"].eq("active"))
                           .pivot_table(index="organism", columns="bucket", values="active", aggfunc="mean") * 100).round(1)
         dataset = dataset.drop(columns="bucket")
+        organism_lines = [line for name, tab in final.organism_tables.items()
+                          for line in ("", f"Per organism x bucket, {name}:", tab.to_string())]
         extra_lines = ["", "Bucket summary (labelled pairs):", final.summary.to_string(), "",
-                       "Active % per organism and bucket:", per_org.to_string(),
+                       "Active % per organism and bucket:", per_org.to_string(), *organism_lines,
                        f"Wrote {split_path}", f"Wrote {out_dir / cfg.split_sidecar_filename}",
                        f"Wrote {reports / cfg.na_only_filename} ({len(labelled.na_only)} pairs)",
                        f"Wrote {reports / cfg.conflicts_filename} ({len(labelled.conflicts)} pairs)"]

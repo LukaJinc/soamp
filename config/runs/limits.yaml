@@ -4,7 +4,8 @@
 max_cost_per_request_usd: 5.0
 max_concurrent_instances: 2
 max_cost_per_24h_usd: 20.0
-max_cells: 40
+# Raised from 40 on 2026-11-27 at the user's request (48-cell baseline ladder); cost, instance and 24 h caps are the real backstops.
+max_cells: 1000
 max_hours_per_instance: 3.0
 # Multiplies the estimate: host speed varies and a dropped instance has no resume.
 safety_margin: 1.25

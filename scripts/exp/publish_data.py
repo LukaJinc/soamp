@@ -28,12 +28,14 @@ log = logging.getLogger("publish_data")
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", default=DEFAULT_DATASET)
+    ap.add_argument("--peptides", nargs="+", metavar="METHOD",
+                    help="ship only these peptide representations (e.g. rdkit): skips the large PeptideCLM table when a run does not need it")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     load_dotenv(REPO_ROOT / ".env")
 
-    wanted = data_files(args.dataset)
+    wanted = data_files(args.dataset, args.peptides)
     present = [f for f in wanted if (REPO_ROOT / f).is_file()]
     for f in wanted:
         log.info("%-60s %s", f, f"{(REPO_ROOT / f).stat().st_size / 1e6:8.2f} MB" if f in present else "(absent: built on the instance)")

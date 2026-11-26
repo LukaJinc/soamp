@@ -88,3 +88,54 @@ def test_check_detects_a_split_cluster():
     bad.loc[idx[0], ["split", "fold_id"]] = ["test", np.nan] if bad.loc[idx[0], "split"] != "test" else ["train", 0.0]
     with pytest.raises(FinalSplitError, match="span more than one bucket"):
         check_final_split(FinalSplit(bad, res.summary, res.sidecar))
+
+
+def _toy_organisms(n_clusters=120, seed=0):
+    """Like ``_toy`` plus an ``organism`` column whose active rate differs per organism and per cluster,
+    so balancing only the overall active share leaves the per-organism shares uneven."""
+    pairs, clusters = _toy(n_clusters, seed)
+    rng = np.random.default_rng(seed + 1)
+    cluster_of = clusters.set_index("peptide_id")["cluster_id"]
+    cluster_bias = {c: rng.uniform(0.1, 0.9) for c in clusters["cluster_id"].unique()}
+    organisms = rng.choice(["org_a", "org_b", "org_c"], size=len(pairs), p=[0.5, 0.3, 0.2])
+    pairs = pairs.assign(organism=organisms)
+    p_active = np.where(pairs["organism"] == "org_c", pairs["peptide_id"].map(cluster_of).map(cluster_bias), 0.6)
+    pairs["label"] = np.where(rng.random(len(pairs)) < p_active, "active", "inactive")
+    return pairs, clusters
+
+
+def _worst_organism_deviation(res, view="full"):
+    return res.organism_tables[f"{view}_active_%"]["max_dev"].max()
+
+
+def test_organism_term_reduces_per_organism_active_spread():
+    pairs, clusters = _toy_organisms()
+    base = dict(n_iterations=30000, lambda_active=30)
+    off = split_labelled_peptides(pairs, clusters, BucketingConfig(**base))
+    on = split_labelled_peptides(pairs, clusters, BucketingConfig(**base, lambda_organism_active=30))
+    assert _worst_organism_deviation(on) < _worst_organism_deviation(off)
+    assert (bucket_of(on.table).groupby(on.table["cluster_id"]).nunique() == 1).all()
+    check_final_split(on)
+
+
+def test_linear_organism_term_balances_the_linear_view():
+    pairs, clusters = _toy_organisms(seed=2)
+    base = dict(n_iterations=30000, lambda_active=30, lambda_organism_active=5)
+    off = split_labelled_peptides(pairs, clusters, BucketingConfig(**base))
+    on = split_labelled_peptides(pairs, clusters, BucketingConfig(**base, lambda_organism_active_linear=30))
+    assert _worst_organism_deviation(on, "linear") < _worst_organism_deviation(off, "linear")
+
+
+def test_organism_weights_zero_keep_the_old_assignment_and_tables_still_reported():
+    pairs, clusters = _toy_organisms()
+    with_col = split_labelled_peptides(pairs, clusters, CFG)
+    without_col = split_labelled_peptides(pairs.drop(columns="organism"), clusters, CFG)
+    assert with_col.table.equals(without_col.table)
+    assert set(with_col.organism_tables) == {"full_rows", "full_active_%", "linear_rows", "linear_active_%"}
+    assert without_col.organism_tables == {}
+
+
+def test_organism_balancing_needs_an_organism_column():
+    pairs, clusters = _toy()
+    with pytest.raises(FinalSplitError):
+        split_labelled_peptides(pairs, clusters, BucketingConfig(n_iterations=100, lambda_organism_active=5))

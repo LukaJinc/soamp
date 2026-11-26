@@ -1,0 +1,13 @@
+# Base for every generated cell on the linear-only subset of the per-organism-balanced dev v2 dataset
+# (data/dev_v2_orgbal_linear/: pairs whose peptide has no intrachain bond and no macrocycle/disulfide;
+# same labels and same test + 5-fold assignment as data/dev_v2_orgbal).
+_base_: cv_dev_v2_base.yaml
+
+exp_id: dev_v2_orgbal_linear_base
+
+paths:
+  data_dir: data/dev_v2_orgbal_linear
+
+wandb_group: dev_v2_orgbal_linear
+wandb_tags:
+  - dev_v2_orgbal_linear_dataset

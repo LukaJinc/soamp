@@ -178,3 +178,13 @@ def test_thresholds_csv_defaults_to_legacy_table_and_is_overridable():
 
     assert TrainConfig().thresholds_csv == Path("config/thresholds/organism_thresholds.csv")
     assert TrainConfig(thresholds_csv="x.csv").thresholds_csv == Path("x.csv")
+
+
+def test_data_filter_defaults_to_no_filter_and_rejects_unknown_keys():
+    from pydantic import ValidationError as _VE
+    from soamp.engine.config import DataFilterConfig, TrainConfig
+
+    assert TrainConfig().data_filter.organism is None
+    assert TrainConfig(data_filter={"organism": "Escherichia coli ATCC 25922"}).data_filter.organism.startswith("Escherichia")
+    with pytest.raises(_VE):
+        DataFilterConfig(organism="x", peptide_group="linear")

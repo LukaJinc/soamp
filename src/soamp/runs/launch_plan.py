@@ -103,15 +103,21 @@ def spec_path_for(experiment: str, shard_index: int) -> Path:
     return Path("config/vast/generated") / f"{experiment}_{shard_index}.yaml"
 
 
-def data_files(dataset: str) -> list[str]:
+def data_files(dataset: str, peptides: list[str] | None = None) -> list[str]:
     """Repo-relative files the data artifact must contain: required inputs + everything the
-    prepare steps would produce (shipping them avoids rebuilding features on the instance)."""
+    prepare steps would produce (shipping them avoids rebuilding features on the instance).
+    ``peptides`` limits the peptide-representation files to those methods (e.g. ``["rdkit"]``)."""
     from soamp.runs.request import DATASETS
 
     ds = DATASETS[dataset]
+    unknown = sorted(set(peptides or []) - set(ds["peptide"]))
+    if unknown:
+        raise ValueError(f"unknown peptide representation(s) {unknown} for dataset {dataset!r}; have {sorted(ds['peptide'])}")
     out = list(ds["required_artifacts"])
-    for group in ds["prepare"].values():
-        for steps in group.values():
+    for kind, group in ds["prepare"].items():
+        for method, steps in group.items():
+            if kind == "peptide" and peptides is not None and method not in peptides:
+                continue
             for _cmd, produces in steps:
                 out.extend(produces)
     return list(dict.fromkeys(out))

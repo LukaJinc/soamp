@@ -79,6 +79,12 @@ class BucketingConfig(BaseModel):
     n_folds: int = 5
     lambda_noncanonical: float = 30.0
     lambda_active: float = 30.0
+    # Per-organism active-rate balance (one term per organism per bucket); 0 = off, which
+    # reproduces the splits built before these existed. The linear weight applies to the same
+    # terms measured only over linear peptides (has_noncanonical == False) so a linear-only
+    # subset of the split stays balanced too.
+    lambda_organism_active: float = 0.0
+    lambda_organism_active_linear: float = 0.0
     n_iterations: int = 100_000
     seed: int = 42
 

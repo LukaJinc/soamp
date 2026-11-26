@@ -13,12 +13,12 @@ trained and scored on: the labelled (peptide, organism) pairs. Balanced: bucket 
 non-linear share and active share. Peptides without a labelled pair carry no weight and
 are not part of the result.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
 
-from soamp.splitting.bucketing import stratified_cluster_split
+from soamp.splitting.bucketing import PeptideGroup, stratified_cluster_split
 from soamp.splitting.config import BucketingConfig
 
 
@@ -31,6 +31,7 @@ class FinalSplit:
     table: pd.DataFrame     # peptide_id, cluster_id, cluster_kind, split, fold_id (NaN for test)
     summary: pd.DataFrame   # one row per bucket
     sidecar: dict           # parameters and counts, for reproducibility
+    organism_tables: dict[str, pd.DataFrame] = field(default_factory=dict)  # "<view>_<rows|active_%>" -> organism x bucket
 
 
 def bucket_of(table: pd.DataFrame) -> pd.Series:
@@ -38,10 +39,24 @@ def bucket_of(table: pd.DataFrame) -> pd.Series:
                      index=table.index)
 
 
+def _organism_groups(pairs: pd.DataFrame, peptide_index: pd.Index, view: str, weight: float) -> list[PeptideGroup]:
+    """One group per organism: per-peptide labelled pairs and active pairs (``view`` only names the group)."""
+    groups = []
+    for organism in sorted(pairs["organism"].unique()):
+        sub = pairs[pairs["organism"] == organism]
+        per = sub.assign(_active=sub["label"].eq("active")).groupby("peptide_id").agg(
+            rows=("label", "size"), active=("_active", "sum")).reindex(peptide_index, fill_value=0)
+        groups.append(PeptideGroup(f"{view}:{organism}", weight, per["rows"].astype(int).tolist(),
+                                   per["active"].astype(int).tolist()))
+    return groups
+
+
 def split_labelled_peptides(pairs: pd.DataFrame, clusters: pd.DataFrame, cfg: BucketingConfig) -> FinalSplit:
     """``pairs``: one row per labelled (peptide, organism) with ``peptide_id``, ``label``
     ('active'/'inactive') and ``has_noncanonical``. ``clusters``: ``peptide_id``, ``cluster_id``,
-    ``cluster_kind`` for (at least) every peptide in ``pairs``."""
+    ``cluster_kind`` for (at least) every peptide in ``pairs``. With ``organism`` in ``pairs`` and
+    ``cfg.lambda_organism_active*`` > 0 the per-organism active rate is balanced as well, over all pairs
+    and/or over the linear pairs only."""
     per_peptide = (pairs.assign(_active=pairs["label"].eq("active"))
                         .groupby("peptide_id")
                         .agg(rows=("label", "size"), active=("_active", "sum"), nc=("has_noncanonical", "first"))
@@ -53,11 +68,21 @@ def split_labelled_peptides(pairs: pd.DataFrame, clusters: pd.DataFrame, cfg: Bu
     cl = clusters.loc[per_peptide.index]
 
     peptide_ids = per_peptide.index.tolist()
+    groups: list[PeptideGroup] = []
+    if cfg.lambda_organism_active > 0 or cfg.lambda_organism_active_linear > 0:
+        if "organism" not in pairs.columns:
+            raise FinalSplitError("per-organism balancing needs an 'organism' column in pairs")
+        if cfg.lambda_organism_active > 0:
+            groups += _organism_groups(pairs, per_peptide.index, "all", cfg.lambda_organism_active)
+        if cfg.lambda_organism_active_linear > 0:
+            linear_pairs = pairs[~pairs["has_noncanonical"].astype(bool)]
+            groups += _organism_groups(linear_pairs, per_peptide.index, "linear", cfg.lambda_organism_active_linear)
     node_communities = pd.DataFrame({"node_id": range(len(peptide_ids)), "community": cl["cluster_id"].to_numpy()})
     assignment = stratified_cluster_split(
         node_communities, peptide_ids, per_peptide["nc"].astype(bool).tolist(),
         row_counts=per_peptide["rows"].astype(int).tolist(),
         active_counts=per_peptide["active"].astype(int).tolist(),
+        groups=groups,
         test_size=cfg.test_size, n_folds=cfg.n_folds,
         lambda_noncanonical=cfg.lambda_noncanonical, lambda_active=cfg.lambda_active,
         n_iterations=cfg.n_iterations, seed=cfg.seed,
@@ -71,6 +96,7 @@ def split_labelled_peptides(pairs: pd.DataFrame, clusters: pd.DataFrame, cfg: Bu
                     for p in peptide_ids],
     })
     summary = summarise(table, per_peptide, cfg)
+    organism_tables = organism_balance_tables(pairs, table) if "organism" in pairs.columns else {}
     sidecar = {
         "method": "stratified_cluster_split over labelled pairs of precomputed clusters",
         "parameters": cfg.model_dump(),
@@ -79,8 +105,27 @@ def split_labelled_peptides(pairs: pd.DataFrame, clusters: pd.DataFrame, cfg: Bu
         "clusters_used": int(table["cluster_id"].nunique()),
         "cluster_kinds": table.drop_duplicates("cluster_id")["cluster_kind"].value_counts().to_dict(),
         "buckets": summary.reset_index().to_dict("records"),
+        "organism_balance": {k: v.reset_index().to_dict("records") for k, v in organism_tables.items()},
     }
-    return FinalSplit(table, summary, sidecar)
+    return FinalSplit(table, summary, sidecar, organism_tables)
+
+
+def organism_balance_tables(pairs: pd.DataFrame, table: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Per organism x bucket pair counts and active % for the full set and the linear subset, with the
+    organism's overall value in column ``all`` and the worst bucket deviation in ``max_dev``."""
+    bucket = bucket_of(table).set_axis(table["peptide_id"])
+    out: dict[str, pd.DataFrame] = {}
+    for view, sub in (("full", pairs), ("linear", pairs[~pairs["has_noncanonical"].astype(bool)])):
+        d = sub.assign(bucket=sub["peptide_id"].map(bucket), active=sub["label"].eq("active"))
+        rows = d.pivot_table(index="organism", columns="bucket", values="active", aggfunc="size", fill_value=0)
+        act = (d.pivot_table(index="organism", columns="bucket", values="active", aggfunc="mean") * 100).round(1)
+        cols = ["test"] + [c for c in sorted(act.columns) if c != "test"]
+        overall = (d.groupby("organism")["active"].mean() * 100).round(1)
+        act = act[cols].assign(all=overall)
+        act["max_dev"] = act[cols].sub(act["all"], axis=0).abs().max(axis=1).round(1)
+        out[f"{view}_rows"] = rows[cols].assign(all=rows.sum(axis=1))
+        out[f"{view}_active_%"] = act
+    return out
 
 
 def summarise(table: pd.DataFrame, per_peptide: pd.DataFrame, cfg: BucketingConfig) -> pd.DataFrame:

@@ -1,0 +1,13 @@
+# Base for every generated cell on the dev v2 per-organism-balanced dataset (data/dev_v2_orgbal/: the dev_v2
+# pairs and labels, test + 5 folds re-assigned so each organism's active share is balanced across buckets;
+# config/data/dev_v2_orgbal.yaml). Cells written by soamp.runs.plan inherit this via `_base_`.
+_base_: cv_dev_v2_base.yaml
+
+exp_id: dev_v2_orgbal_base
+
+paths:
+  data_dir: data/dev_v2_orgbal
+
+wandb_group: dev_v2_orgbal
+wandb_tags:
+  - dev_v2_orgbal_dataset

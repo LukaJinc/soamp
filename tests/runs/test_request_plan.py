@@ -6,7 +6,7 @@ from pydantic import ValidationError
 
 from soamp.engine.config import TrainConfig
 from soamp.runs.plan import expand, request_hash, write_cell_configs
-from soamp.runs.request import ExperimentRequest
+from soamp.runs.request import ARCHITECTURES, DATASETS, ExperimentRequest
 from soamp.utils.config import REPO_ROOT, load_config
 
 
@@ -225,3 +225,62 @@ def test_xgboost_rejected_with_molgraph_and_cell_config_validates(tmp_path):
         assert cfg.model.architecture == "xgboost_classifier"
         assert (cfg.model.xgboost_classifier.n_estimators, cfg.model.xgboost_classifier.max_depth,
                 cfg.model.xgboost_classifier.subsample) == (50, 4, 0.8)
+
+
+# ---- baselines, class balancing and organism subsets ---------------------------------------------
+
+def _baseline_req(**kw):
+    return _req(dataset="dev_v2_orgbal_linear", representations={"peptide": ["rdkit"], "organism": ["vocab"]},
+                class_balancing="none", organism_subsets=["all", "each"],
+                architectures=[{"name": "logistic_regression_classifier"}, {"name": "decision_tree_classifier"},
+                               {"name": "xgboost_classifier", "hparams": {"n_estimators": 300, "learning_rate": 0.1, "max_depth": 6}}],
+                **kw)
+
+
+def test_baseline_request_expands_to_3_models_x_8_organism_variants():
+    cells = expand(_baseline_req())
+    assert len(cells) == 24 and len({c.exp_id for c in cells}) == 24
+    filters = [c.config.get("data_filter", {}).get("organism") for c in cells]
+    assert sorted(set(filter(None, filters))) == sorted(DATASETS["dev_v2_orgbal_linear"]["organisms"])
+    assert filters.count(None) == 3                                   # the pooled cell of each model
+    assert all(c.config["class_balancing"] == {"mode": "none"} for c in cells)
+    assert all(c.config["model"]["architecture"] in ARCHITECTURES for c in cells)
+    pooled = next(c for c in cells if "data_filter" not in c.config)
+    assert "organism_all" in pooled.config["wandb_tags"] and "__all__" in pooled.exp_id
+    ecoli = next(c for c in cells if "e_coli" in c.exp_id)
+    assert "organism_e_coli" in ecoli.config["wandb_tags"]
+
+
+def test_default_request_keeps_class_weighting_and_pools_organisms():
+    cells = expand(_req())
+    assert all("class_balancing" not in c.config and "data_filter" not in c.config for c in cells)
+
+
+def test_baseline_architectures_reject_epochs_and_foreign_keys_and_molgraph():
+    with pytest.raises(ValidationError, match="single fit"):
+        _req(architectures=[{"name": "logistic_regression_classifier", "epochs": 5}])
+    with pytest.raises(ValidationError, match="decision_tree_classifier"):
+        _req(architectures=[{"name": "decision_tree_classifier", "hparams": {"C": 1.0}}])
+    with pytest.raises(ValidationError, match="molgraph"):
+        _req(representations={"peptide": ["molgraph"], "organism": ["vocab"]}, architectures=[{"name": "decision_tree_classifier"}])
+
+
+def test_organism_subsets_are_validated_and_explicit_names_work():
+    with pytest.raises(ValidationError, match="not available"):
+        _req(dataset="dev_v2_orgbal", organism_subsets=["Mycoplasma"])
+    with pytest.raises(ValidationError, match="no organism list"):
+        _req(dataset="dev", organism_subsets=["each"])
+    with pytest.raises(ValidationError, match="repeats"):
+        _req(dataset="dev_v2_orgbal", organism_subsets=["all", "all"])
+    one = _req(dataset="dev_v2_orgbal", organism_subsets=["Escherichia coli ATCC 25922"],
+               representations={"peptide": ["rdkit"], "organism": ["vocab"]})
+    assert {c.config["data_filter"]["organism"] for c in expand(one)} == {"Escherichia coli ATCC 25922"}
+
+
+def test_baseline_cell_configs_validate_against_train_config(tmp_path):
+    shutil.copytree(REPO_ROOT / "config/train", tmp_path / "config/train", ignore=shutil.ignore_patterns("generated"))
+    req = _baseline_req()
+    for p in write_cell_configs(req, expand(req), repo_root=tmp_path):
+        cfg = load_config(tmp_path / p, TrainConfig)
+        assert cfg.class_balancing.mode == "none" and cfg.paths.data_dir.as_posix().endswith("data/dev_v2_orgbal_linear")
+        assert cfg.data_filter.organism is None or cfg.data_filter.organism in DATASETS["dev_v2_orgbal_linear"]["organisms"]

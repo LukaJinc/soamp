@@ -1,0 +1,17 @@
+=== Train CV: orgbal_smoke_v1__dt__rdkit_vocab__all__9759a1 ===
+git_sha: 8531ad3e7ef128f4dc974c0d7d1aea171b30872a
+seed: 42
+device: cpu
+epochs per fold: 5
+folds: ['0', '1', '2', '3', '4']
+cv_results_df: /Users/lukajin/PycharmProjects/soamp/reports/cv_results_orgbal_smoke_v1__dt__rdkit_vocab__all__9759a1.csv (50900 rows)
+loss curves: /Users/lukajin/PycharmProjects/soamp/reports/cv_loss_curves_orgbal_smoke_v1__dt__rdkit_vocab__all__9759a1.csv (5 rows)
+snapshots: 10 rows, 10180 held-out predictions (every 10 epochs)
+mean +/- std across folds:
+            accuracy                  f1  ... f1_matched mcc_matched          
+                mean       std      mean  ...        std        mean       std
+eval_group                                ...                                 
+fit         0.987967  0.000878  0.990013  ...   0.000812    0.975566  0.002030
+val         0.610785  0.019102  0.664314  ...   0.010183    0.204998  0.026039
+
+[2 rows x 16 columns]

@@ -109,6 +109,11 @@ def main() -> None:
 
     with open(classification_csv, newline="") as f:
         all_rows = list(csv.DictReader(f))
+    if CFG.data_filter.organism is not None:
+        all_rows = [r for r in all_rows if r["organism"] == CFG.data_filter.organism]
+        if not all_rows:
+            raise SystemExit(f"data_filter.organism={CFG.data_filter.organism!r} matches no row of {classification_csv}")
+        log.info(f"data_filter: only organism {CFG.data_filter.organism!r} ({len(all_rows)} rows)")
     train_rows = assign_train_folds(all_rows, load_peptide_split(folds_csv))
     fold_ids = sorted(set(r["fold_id"] for r in train_rows))
     log.info(f"{len(train_rows)} train rows across {len(fold_ids)} folds: {fold_ids}")
@@ -171,7 +176,14 @@ def main() -> None:
     # Every fold builds the same architecture, so one throwaway instance from
     # the preview bundle gives the exact trainable-parameter count to log.
     is_tree = CFG.model.architecture in TREE_ARCHITECTURES
-    run.summary["n_parameters"] = count_tree_parameters(CFG.model.active_kwargs(), CFG.model.architecture) if is_tree else count_parameters(build_model(
+    run.summary["n_parameters"] = count_tree_parameters(
+        CFG.model.active_kwargs(), CFG.model.architecture,
+        n_features=(preview_bundle.featurization.peptide_feature_dim or 0) + (
+            preview_bundle.featurization.organism_vocab_size
+            if preview_bundle.featurization.organism_output_kind == "index"
+            else preview_bundle.featurization.organism_feature_dim or 0),
+        n_fit_rows=len(train_rows),
+    ) if is_tree else count_parameters(build_model(
         preview_bundle, architecture=CFG.model.architecture,
         graph_encoder_kwargs=CFG.model.graph_encoder.model_dump(), **CFG.model.active_kwargs(),
     ))

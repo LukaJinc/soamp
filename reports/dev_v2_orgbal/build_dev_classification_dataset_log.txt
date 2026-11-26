@@ -1,0 +1,87 @@
+=== Dev classification dataset ===
+threshold_unit: µg/ml (recomputed from concentration)
+records: 26535
+na_records: 1113
+record_labels: {'active': 12131, 'uncertain': 7734, 'inactive': 6670}
+censor_directions: {'exact': 21233, 'gt': 5223, 'lt': 79}
+gt_records_below_active_threshold_not_labelled_active: 98
+peptide_organism_pairs: 22840
+labelled_pairs: 16189
+labels: {'active': 10112, 'inactive': 6077}
+na_only_labelled_pairs: 1038
+pairs_dropped_for_conflicting_labels: 285
+of_which_involving_an_na_row: 34
+peptides: 8478
+by_organism: {'Acinetobacter baumannii ATCC 19606': {'active': 945, 'inactive': 434}, 'Bacillus subtilis ATCC 6633': {'active': 538, 'inactive': 194}, 'Enterococcus faecalis ATCC 29212': {'active': 676, 'inactive': 560}, 'Escherichia coli ATCC 25922': {'active': 3433, 'inactive': 1910}, 'Klebsiella pneumoniae ATCC 700603': {'active': 418, 'inactive': 417}, 'Pseudomonas aeruginosa ATCC 27853': {'active': 1937, 'inactive': 1252}, 'Staphylococcus aureus ATCC 25923': {'active': 2165, 'inactive': 1310}}
+by_split: {'train': 12960, 'test': 3229}
+Wrote /Users/lukajin/PycharmProjects/soamp/data/dev_v2_orgbal/mic_classification_dataset.csv
+Wrote /Users/lukajin/PycharmProjects/soamp/data/dev_v2_orgbal/peptide_split.csv
+
+Bucket summary (labelled pairs):
+        peptides  clusters  pairs  nonlinear_pairs  active_pairs  pair_share_%  target_%  nonlinear_%  active_%
+bucket                                                                                                         
+test        1692       546   3229              692          2018         19.95      20.0        21.43     62.50
+fold_0      1366       544   2594              555          1620         16.02      16.0        21.40     62.45
+fold_1      1390       544   2585              553          1616         15.97      16.0        21.39     62.51
+fold_2      1352       544   2590              555          1619         16.00      16.0        21.43     62.51
+fold_3      1352       544   2600              557          1621         16.06      16.0        21.42     62.35
+fold_4      1326       544   2591              555          1618         16.00      16.0        21.42     62.45
+
+Active % per organism and bucket:
+bucket                              fold_0  fold_1  fold_2  fold_3  fold_4  test
+organism                                                                        
+Acinetobacter baumannii ATCC 19606    68.6    68.5    68.6    68.6    68.5  68.5
+Bacillus subtilis ATCC 6633           73.5    73.6    73.6    73.5    73.4  73.4
+Enterococcus faecalis ATCC 29212      54.7    54.5    54.7    54.8    54.7  54.6
+Escherichia coli ATCC 25922           64.3    64.2    64.2    64.3    64.2  64.3
+Klebsiella pneumoniae ATCC 700603     50.0    50.0    50.3    50.3    50.0  49.7
+Pseudomonas aeruginosa ATCC 27853     60.8    60.7    60.7    60.8    60.8  60.7
+Staphylococcus aureus ATCC 25923      62.3    62.3    62.2    62.4    62.3  62.3
+
+Per organism x bucket, full_rows:
+bucket                              test  fold_0  fold_1  fold_2  fold_3  fold_4   all
+organism                                                                              
+Acinetobacter baumannii ATCC 19606   260     194     184     264     229     248  1379
+Bacillus subtilis ATCC 6633          143     136     121     121      83     128   732
+Enterococcus faecalis ATCC 29212     216     223     176     201     188     232  1236
+Escherichia coli ATCC 25922         1147     890     813     825     841     827  5343
+Klebsiella pneumoniae ATCC 700603    173     134     100     143     151     134   835
+Pseudomonas aeruginosa ATCC 27853    598     502     570     504     518     497  3189
+Staphylococcus aureus ATCC 25923     692     515     621     532     590     525  3475
+
+Per organism x bucket, full_active_%:
+bucket                              test  fold_0  fold_1  fold_2  fold_3  fold_4   all  max_dev
+organism                                                                                       
+Acinetobacter baumannii ATCC 19606  68.5    68.6    68.5    68.6    68.6    68.5  68.5      0.1
+Bacillus subtilis ATCC 6633         73.4    73.5    73.6    73.6    73.5    73.4  73.5      0.1
+Enterococcus faecalis ATCC 29212    54.6    54.7    54.5    54.7    54.8    54.7  54.7      0.2
+Escherichia coli ATCC 25922         64.3    64.3    64.2    64.2    64.3    64.2  64.3      0.1
+Klebsiella pneumoniae ATCC 700603   49.7    50.0    50.0    50.3    50.3    50.0  50.1      0.4
+Pseudomonas aeruginosa ATCC 27853   60.7    60.8    60.7    60.7    60.8    60.8  60.7      0.1
+Staphylococcus aureus ATCC 25923    62.3    62.3    62.3    62.2    62.4    62.3  62.3      0.1
+
+Per organism x bucket, linear_rows:
+bucket                              test  fold_0  fold_1  fold_2  fold_3  fold_4   all
+organism                                                                              
+Acinetobacter baumannii ATCC 19606   223     167     143     208     179     190  1110
+Bacillus subtilis ATCC 6633           94      96      70      86      60      83   489
+Enterococcus faecalis ATCC 29212     163     165     134     152     150     179   943
+Escherichia coli ATCC 25922          901     703     631     629     657     665  4186
+Klebsiella pneumoniae ATCC 700603    131     116      74     110     124      96   651
+Pseudomonas aeruginosa ATCC 27853    483     384     445     394     412     354  2472
+Staphylococcus aureus ATCC 25923     542     408     535     456     461     469  2871
+
+Per organism x bucket, linear_active_%:
+bucket                              test  fold_0  fold_1  fold_2  fold_3  fold_4   all  max_dev
+organism                                                                                       
+Acinetobacter baumannii ATCC 19606  66.4    66.5    66.4    66.3    66.5    66.3  66.4      0.1
+Bacillus subtilis ATCC 6633         70.2    69.8    70.0    69.8    70.0    69.9  69.9      0.3
+Enterococcus faecalis ATCC 29212    47.9    47.9    47.8    48.0    48.0    48.0  47.9      0.1
+Escherichia coli ATCC 25922         63.7    63.7    63.7    63.8    63.8    63.8  63.7      0.1
+Klebsiella pneumoniae ATCC 700603   42.0    42.2    41.9    41.8    41.9    41.7  41.9      0.3
+Pseudomonas aeruginosa ATCC 27853   57.1    57.0    57.1    57.1    57.0    57.1  57.1      0.1
+Staphylococcus aureus ATCC 25923    60.7    60.8    60.7    60.7    60.7    60.8  60.7      0.1
+Wrote /Users/lukajin/PycharmProjects/soamp/data/dev_v2_orgbal/dbaasp_dev_split_final.parquet
+Wrote /Users/lukajin/PycharmProjects/soamp/data/dev_v2_orgbal/dev_split_final.json
+Wrote /Users/lukajin/PycharmProjects/soamp/reports/dev_v2_orgbal/na_only_pairs.csv (1038 pairs)
+Wrote /Users/lukajin/PycharmProjects/soamp/reports/dev_v2_orgbal/label_conflicts.csv (285 pairs)

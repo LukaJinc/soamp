@@ -38,12 +38,42 @@ class BucketingError(ValueError):
     fractions that are invalid or don't sum to ~1.0."""
 
 
+@dataclass(frozen=True)
+class ClusterGroup:
+    """An extra active-rate balance target: ``rows[c]`` records of cluster ``c`` belong to the group
+    (e.g. one organism, or one organism restricted to linear peptides) and ``active[c]`` of them
+    are active. A bucket is penalised ``weight * (bucket_active_rate - global_active_rate) ** 2``."""
+
+    name: str
+    weight: float
+    rows: dict[int, int]
+    active: dict[int, int]
+
+
+@dataclass(frozen=True)
+class PeptideGroup:
+    """``ClusterGroup`` before clustering: per-peptide counts aligned with ``peptide_ids``."""
+
+    name: str
+    weight: float
+    row_counts: list[int]
+    active_counts: list[int]
+
+
 def _validate_inputs(
     cluster_sizes: dict[int, int],
     cluster_noncanonical_counts: dict[int, int],
     bucket_target_fractions: dict[str, float],
     cluster_active_counts: dict[int, int] | None = None,
+    groups: list[ClusterGroup] | None = None,
 ) -> None:
+    for g in groups or []:
+        if g.weight < 0:
+            raise BucketingError(f"group {g.name!r}: weight must be >= 0")
+        if g.rows.keys() != cluster_sizes.keys() or g.active.keys() != cluster_sizes.keys():
+            raise BucketingError(f"group {g.name!r}: rows/active must have the same keys as cluster_sizes")
+        if any(g.active[c] > g.rows[c] for c in g.rows):
+            raise BucketingError(f"group {g.name!r}: active count exceeds row count in a cluster")
     if cluster_sizes.keys() != cluster_noncanonical_counts.keys():
         raise BucketingError(
             "cluster_sizes and cluster_noncanonical_counts must have identical keys"
@@ -81,6 +111,7 @@ def assign_clusters_to_buckets(
     bucket_target_fractions: dict[str, float],
     *,
     cluster_active_counts: dict[int, int] | None = None,
+    groups: list[ClusterGroup] | None = None,
     lambda_noncanonical: float = 8.0,
     lambda_active: float = 0.0,
     n_iterations: int = 40_000,
@@ -104,11 +135,16 @@ def assign_clusters_to_buckets(
         + lambda_noncanonical * sum_bucket((bucket_nc_rate - dataset_nc_rate) ** 2)
         + lambda_active * sum_bucket((bucket_active_rate - dataset_active_rate) ** 2)
 
+        + sum_group sum_bucket(group.weight * (bucket_group_active_rate - global_group_active_rate) ** 2)
+
     reverting the swap otherwise. The active term is skipped when
-    `cluster_active_counts` is None. Deterministic given `seed`.
+    `cluster_active_counts` is None; the group terms (per-organism active rates)
+    are skipped when `groups` is empty, and a bucket with no record of a group
+    contributes nothing for it. Deterministic given `seed`.
     """
+    groups = list(groups or [])
     _validate_inputs(
-        cluster_sizes, cluster_noncanonical_counts, bucket_target_fractions, cluster_active_counts
+        cluster_sizes, cluster_noncanonical_counts, bucket_target_fractions, cluster_active_counts, groups
     )
 
     clusters = list(cluster_sizes.keys())
@@ -120,6 +156,12 @@ def assign_clusters_to_buckets(
         if use_active else np.zeros(len(clusters))
     )
     n_clusters = len(clusters)
+    n_groups = len(groups)
+    g_rows = np.array([[g.rows[c] for g in groups] for c in clusters], dtype=float).reshape(n_clusters, n_groups)
+    g_act = np.array([[g.active[c] for g in groups] for c in clusters], dtype=float).reshape(n_clusters, n_groups)
+    g_weight = np.array([g.weight for g in groups], dtype=float)
+    g_total = g_rows.sum(axis=0)
+    g_global_rate = np.divide(g_act.sum(axis=0), g_total, out=np.zeros(n_groups), where=g_total > 0)
 
     bucket_names = list(bucket_target_fractions.keys())
     n_buckets = len(bucket_names)
@@ -138,19 +180,27 @@ def assign_clusters_to_buckets(
     bsize = np.zeros(n_buckets)
     bnc = np.zeros(n_buckets)
     bact = np.zeros(n_buckets)
+    brows_g = np.zeros((n_buckets, n_groups))
+    bact_g = np.zeros((n_buckets, n_groups))
     for idx in order:
         b = int(np.argmin(bsize - target_size))
         assign[idx] = b
         bsize[b] += sizes[idx]
         bnc[b] += ncs[idx]
         bact[b] += acts[idx]
+        brows_g[b] += g_rows[idx]
+        bact_g[b] += g_act[idx]
 
-    def bucket_term(b: int, size: float, nc: float, act: float) -> float:
+    def bucket_term(b: int, size: float, nc: float, act: float, rows_g: np.ndarray, act_g: np.ndarray) -> float:
         term = ((size - target_size[b]) / target_size[b]) ** 2
         if size > 0:
             term += lambda_noncanonical * (nc / size - dataset_nc_rate) ** 2
             if use_active:
                 term += lambda_active * (act / size - dataset_active_rate) ** 2
+        if n_groups:
+            present = rows_g > 0
+            rate = np.divide(act_g, rows_g, out=np.zeros(n_groups), where=present)
+            term += float((g_weight * present * (rate - g_global_rate) ** 2).sum())
         return float(term)
 
     # Stage 2: randomized swap local search; a swap only changes two buckets,
@@ -162,16 +212,21 @@ def assign_clusters_to_buckets(
             if a == b:
                 continue
             d_size, d_nc, d_act = sizes[j] - sizes[i], ncs[j] - ncs[i], acts[j] - acts[i]
-            old = bucket_term(a, bsize[a], bnc[a], bact[a]) + bucket_term(
-                b, bsize[b], bnc[b], bact[b]
+            d_rows_g, d_act_g = g_rows[j] - g_rows[i], g_act[j] - g_act[i]
+            old = bucket_term(a, bsize[a], bnc[a], bact[a], brows_g[a], bact_g[a]) + bucket_term(
+                b, bsize[b], bnc[b], bact[b], brows_g[b], bact_g[b]
             )
-            new = bucket_term(a, bsize[a] + d_size, bnc[a] + d_nc, bact[a] + d_act) + bucket_term(
-                b, bsize[b] - d_size, bnc[b] - d_nc, bact[b] - d_act
+            new = bucket_term(
+                a, bsize[a] + d_size, bnc[a] + d_nc, bact[a] + d_act, brows_g[a] + d_rows_g, bact_g[a] + d_act_g
+            ) + bucket_term(
+                b, bsize[b] - d_size, bnc[b] - d_nc, bact[b] - d_act, brows_g[b] - d_rows_g, bact_g[b] - d_act_g
             )
             if new < old:
                 assign[i], assign[j] = b, a
                 bsize[a] += d_size; bnc[a] += d_nc; bact[a] += d_act
                 bsize[b] -= d_size; bnc[b] -= d_nc; bact[b] -= d_act
+                brows_g[a] += d_rows_g; bact_g[a] += d_act_g
+                brows_g[b] -= d_rows_g; bact_g[b] -= d_act_g
 
     return {clusters[idx]: bucket_names[b] for idx, b in enumerate(assign)}
 
@@ -191,6 +246,7 @@ def stratified_cluster_split(
     *,
     row_counts: list[int] | None = None,
     active_counts: list[int] | None = None,
+    groups: list[PeptideGroup] | None = None,
     test_size: float = 0.2,
     n_folds: int = 5,
     lambda_noncanonical: float = 8.0,
@@ -209,6 +265,11 @@ def stratified_cluster_split(
     (what a model is scored on) instead of unique peptides; without them
     every peptide weighs 1 and no active term is applied. Peptides are still
     moved only as part of whole clusters.
+
+    `groups` adds one active-rate balance target per entry (typically one per
+    organism, optionally a second set restricted to linear peptides); each
+    carries per-peptide `row_counts`/`active_counts` aligned with
+    `peptide_ids` and a `weight` (see `assign_clusters_to_buckets`).
 
     `node_communities` (columns: node_id, community) is Leiden's raw output
     and may omit isolated nodes with no edges at all -- any peptide_id whose
@@ -245,10 +306,18 @@ def stratified_cluster_split(
             next_community += 1
         communities.append(node_to_community[node_id])
 
+    groups = list(groups or [])
+    for g in groups:
+        if len(g.row_counts) != len(peptide_ids) or len(g.active_counts) != len(peptide_ids):
+            raise BucketingError(f"group {g.name!r}: counts must be the same length as peptide_ids")
     cluster_sizes: dict[int, int] = {}
     cluster_nc: dict[int, int] = {}
     cluster_active: dict[int, int] = {}
+    cluster_groups = [ClusterGroup(g.name, g.weight, {}, {}) for g in groups]
     for k, (community, is_nc) in enumerate(zip(communities, has_noncanonical)):
+        for cg, g in zip(cluster_groups, groups):
+            cg.rows[community] = cg.rows.get(community, 0) + g.row_counts[k]
+            cg.active[community] = cg.active.get(community, 0) + g.active_counts[k]
         cluster_sizes[community] = cluster_sizes.get(community, 0) + row_counts[k]
         cluster_nc[community] = cluster_nc.get(community, 0) + (row_counts[k] if is_nc else 0)
         cluster_active[community] = cluster_active.get(community, 0) + (
@@ -262,6 +331,7 @@ def stratified_cluster_split(
     cluster_bucket = assign_clusters_to_buckets(
         cluster_sizes, cluster_nc, bucket_target_fractions,
         cluster_active_counts=cluster_active if active_counts is not None else None,
+        groups=cluster_groups,
         lambda_noncanonical=lambda_noncanonical, lambda_active=lambda_active,
         n_iterations=n_iterations, seed=seed,
     )
@@ -295,6 +365,12 @@ def stratified_cluster_split(
         if active_counts is not None:
             stats["active_fraction_rows"] = (
                 sum(active_counts[k] for k in members) / n_rows if n_rows else 0.0
+            )
+        for g in groups:
+            g_rows_b = sum(g.row_counts[k] for k in members)
+            stats[f"group_rows[{g.name}]"] = g_rows_b
+            stats[f"group_active_fraction[{g.name}]"] = (
+                sum(g.active_counts[k] for k in members) / g_rows_b if g_rows_b else None
             )
         bucket_stats[name] = stats
 

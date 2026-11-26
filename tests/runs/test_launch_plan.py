@@ -1,6 +1,7 @@
 import subprocess
 import time
 
+import pytest
 import yaml
 
 from soamp.runs.launch_plan import WANDB_PIN, build_onstart_cmd, build_run_spec, shard, spec_path_for
@@ -100,3 +101,15 @@ def test_onstart_hands_over_to_remote_main_when_everything_works(tmp_path):
     rc, calls, out = _run_onstart(tmp_path, curl_code="404")
     assert rc == 0 and "handed over" in out
     assert "setsid nohup bash scripts/vast/remote_main.sh" in calls and "vastai destroy" not in calls
+
+
+def test_data_files_can_be_limited_to_some_peptide_representations():
+    from soamp.runs.launch_plan import data_files
+
+    full = data_files("dev_v2_orgbal")
+    rdkit = data_files("dev_v2_orgbal", ["rdkit"])
+    assert full[:2] == rdkit[:2] and set(rdkit) < set(full)
+    assert not any("peptideclm" in f for f in rdkit) and any("rdkit" in f for f in rdkit)
+    assert any("organism_vocab" in f for f in rdkit)           # the organism side always ships
+    with pytest.raises(ValueError, match="unknown peptide representation"):
+        data_files("dev_v2_orgbal", ["nope"])

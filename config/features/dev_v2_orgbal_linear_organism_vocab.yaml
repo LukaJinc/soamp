@@ -1,0 +1,7 @@
+# Vocab-embedding organism features (7 strains) for the dev v2 dataset (data/dev_v2_orgbal_linear/: seven strains, MIC recomputed from
+# concentration). Same method as organism_vocab.yaml; only the data dir moves.
+_base_: organism_vocab.yaml
+
+paths:
+  data_dir: data/dev_v2_orgbal_linear
+  reports_dir: reports/dev_v2_orgbal_linear   # keep dev v2 logs apart from the older runs

@@ -12,7 +12,8 @@ the analysis step needs no per-architecture code:
   * a boosting round plays the role of an epoch: ``on_epoch_end`` fires once per
     round and snapshots fire after rounds N, 2N, ... and the last one.
 
-Two model families share this path (``TREE_ARCHITECTURES``):
+Four model families share this path (``TREE_ARCHITECTURES``); the last two are single-fit baselines
+(one fit = one "round", so their curves and snapshots have a single point):
 
   * ``hist_gradient_boosting_classifier`` -- scikit-learn's HistGradientBoostingClassifier:
     a pinned dependency that needs no system OpenMP library and gives per-round scores
@@ -21,6 +22,8 @@ Two model families share this path (``TREE_ARCHITECTURES``):
     isolated worker process (``xgb_worker.py``): its OpenMP runtime collides with torch's and
     scikit-learn's in one process on macOS (segfault / hang), and this way this process never
     imports xgboost. Per-round raw margins are log-odds, base score included.
+
+  * ``logistic_regression_classifier`` / ``decision_tree_classifier`` -- scikit-learn baselines.
 
 Each family is wrapped in a tiny adapter (``fit_tree`` -> object with ``n_rounds``,
 ``staged_logits(name)`` and ``logits(name)`` for the matrices handed to it); everything after the
@@ -38,6 +41,8 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
 
 from soamp.data.factory import build_dataset
 from soamp.data.torch_dataset import LABEL_TO_INT
@@ -47,6 +52,10 @@ from soamp.engine.metrics import compute_binary_metrics, logits_to_predictions
 
 HGB = "hist_gradient_boosting_classifier"
 XGB = "xgboost_classifier"
+LR = "logistic_regression_classifier"
+DT = "decision_tree_classifier"
+# A fully grown tree has pure leaves (probability 0 or 1): clip so the log-odds, and so the BCE loss, stay finite.
+_TREE_PROB_EPS = 1e-6
 _XGB_WORKER = Path(__file__).with_name("xgb_worker.py")   # see that file for why XGBoost runs in its own process
 
 
@@ -76,6 +85,25 @@ class _FittedHGB(_FittedTree):
 
     def logits(self, name):
         return np.asarray(self.model.decision_function(self.sets[name]), dtype=float)
+
+
+class _FittedSingleFit(_FittedTree):
+    """A scikit-learn baseline: one fit, so one "round" whose scores are the final ones."""
+
+    n_rounds = 1
+
+    def __init__(self, model, sets: dict[str, np.ndarray]):
+        self.model, self.sets = model, sets
+
+    def logits(self, name):
+        x = self.sets[name]
+        if hasattr(self.model, "decision_function"):
+            return np.asarray(self.model.decision_function(x), dtype=float)
+        p = np.clip(self.model.predict_proba(x)[:, 1], _TREE_PROB_EPS, 1.0 - _TREE_PROB_EPS)
+        return np.log(p / (1.0 - p))
+
+    def staged_logits(self, name):
+        return iter([self.logits(name)])
 
 
 class _FittedXGB(_FittedTree):
@@ -117,7 +145,15 @@ def fit_tree(architecture: str, params: dict, x: np.ndarray, y: np.ndarray, samp
         return _FittedHGB(model, sets)
     if architecture == XGB:
         return _FittedXGB(_run_xgb_worker(params, seed, x, y, sample_weight, sets))
-    raise TreeModelError(f"unknown tree architecture {architecture!r}; known: {[HGB, XGB]}")
+    if architecture == LR:
+        model = LogisticRegression(**params, random_state=seed)
+        model.fit(x, y, sample_weight=sample_weight)
+        return _FittedSingleFit(model, sets)
+    if architecture == DT:
+        model = DecisionTreeClassifier(**params, random_state=seed)
+        model.fit(x, y, sample_weight=sample_weight)
+        return _FittedSingleFit(model, sets)
+    raise TreeModelError(f"unknown tree architecture {architecture!r}; known: {[HGB, XGB, LR, DT]}")
 
 
 def weighted_bce_from_logits(logits: np.ndarray, labels: np.ndarray, pos_weight: float | None) -> float:
@@ -148,9 +184,20 @@ def dataset_to_matrix(dataset, *, organism_vocab_size: int | None, organism_outp
     return np.hstack([peptide_x, organism_x]), np.asarray(labels, dtype=int)
 
 
-def count_tree_parameters(params: dict, architecture: str = HGB) -> int:
+def count_tree_parameters(params: dict, architecture: str = HGB, *, n_features: int | None = None, n_fit_rows: int | None = None) -> int:
     """Upper bound on leaves (rounds x max leaves per tree) -- the tree analogue of n_parameters.
-    HGB: ``max_iter * max_leaf_nodes``; XGBoost: ``n_estimators * 2**max_depth``."""
+    HGB: ``max_iter * max_leaf_nodes``; XGBoost: ``n_estimators * 2**max_depth``; logistic regression:
+    ``n_features + 1``; decision tree: ``2**max_depth`` leaves, or one per fit row when the depth is unbounded."""
+    if architecture == LR:
+        if n_features is None:
+            raise TreeModelError("n_features is required to count logistic-regression parameters")
+        return int(n_features) + 1
+    if architecture == DT:
+        if params.get("max_depth") is not None:
+            return 2 ** int(params["max_depth"])
+        if n_fit_rows is None:
+            raise TreeModelError("n_fit_rows is required to bound an unbounded decision tree")
+        return int(n_fit_rows)
     if architecture == XGB:
         return int(params["n_estimators"]) * 2 ** int(params["max_depth"])
     return int(params["max_iter"]) * int(params["max_leaf_nodes"])
