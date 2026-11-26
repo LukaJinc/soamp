@@ -1,0 +1,18 @@
+# Follow-up to cycle 3 (dev_v2_trees_reg_v3): with row subsampling XGBoost depends on the seed.
+# Two new seeds on depth-8 trees at lr 0.05 (best tree MCC, 0.4565) and lr 0.03 (val loss 0.4252,
+# close to the slower depth-10 run at a fraction of its cost).
+experiment: dev_v2_trees_seeds_v2
+seeds: [7, 123]
+representations:
+  peptide: [peptideclm]
+  organism: [vocab]
+architectures:
+  - name: xgboost_classifier
+    hparams:
+      n_estimators: 600
+      learning_rate: [0.03, 0.05]
+      max_depth: 8
+      min_child_weight: 1
+      subsample: 0.8
+      colsample_bytree: 0.5
+      reg_lambda: 5.0

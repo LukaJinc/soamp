@@ -1,0 +1,12 @@
+# Follow-up to cycle 3 (dev_v2_nets_molgraph_v1): the wider molgraph MLP ([64,32], batch 128,
+# wd 1e-4, 30 epochs) had the best val MCC of any run (0.4711) on seed 42, but the MLP is
+# seed-sensitive. Two new seeds, plus an even wider head and a smaller batch.
+experiment: dev_v2_nets_molgraph_v2
+seeds: [7, 123]
+representations:
+  peptide: [molgraph]
+  organism: [vocab]
+architectures:
+  - name: baseline_classifier
+    epochs: 30
+    hparams: {organism_embed_dim: 8, hidden_dims: [[64, 32], [128, 64]], batch_size: [64, 128], weight_decay: 1.0e-4}
